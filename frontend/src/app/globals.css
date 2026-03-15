@@ -1,0 +1,588 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.some-class {
+  transition-duration: 500ms;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #030712;
+  color: #fff;
+  font-family: 'Rajdhani', sans-serif;
+  overflow-x: hidden;
+  cursor: default;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(#7c3aed, #be185d);
+  border-radius: 2px;
+}
+
+/* ── Core Animations ───────────────────────────────── */
+@keyframes twinkle {
+
+  0%,
+  100% {
+    opacity: 0.08;
+    transform: scale(0.6);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+}
+
+@keyframes floatUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-90px) scale(1.5);
+  }
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-150%);
+  }
+
+  to {
+    transform: translateX(150%);
+  }
+}
+
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes vsFlash {
+
+  0%,
+  100% {
+    color: #ef4444;
+    text-shadow: 0 0 10px #ef4444, 0 0 30px #ef4444;
+  }
+
+  50% {
+    color: #fbbf24;
+    text-shadow: 0 0 20px #fbbf24, 0 0 50px #fbbf24, 0 0 80px #fbbf24;
+  }
+}
+
+@keyframes bossGlow {
+
+  0%,
+  100% {
+    text-shadow: 0 0 8px #ef4444;
+  }
+
+  50% {
+    text-shadow: 0 0 20px #ef4444, 0 0 40px #ef4444, 0 0 60px #ef4444;
+  }
+}
+
+/* ── Character Animations ──────────────────────────── */
+@keyframes heroIdle {
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+
+  25% {
+    transform: translateY(-8px) rotate(-1deg);
+  }
+
+  75% {
+    transform: translateY(-4px) rotate(1deg);
+  }
+}
+
+@keyframes monsterIdle {
+
+  0%,
+  100% {
+    transform: translateY(0px) scaleX(1);
+  }
+
+  30% {
+    transform: translateY(-10px) scaleX(1.02);
+  }
+
+  60% {
+    transform: translateY(-5px) scaleX(0.98);
+  }
+}
+
+@keyframes heroAttackForward {
+  0% {
+    transform: translateX(0) scaleX(1) rotate(0deg);
+  }
+
+  20% {
+    transform: translateX(-15px) scaleX(0.9) rotate(-5deg);
+  }
+
+  50% {
+    transform: translateX(80px) scaleX(1.2) rotate(8deg);
+  }
+
+  70% {
+    transform: translateX(70px) scaleX(1.1) rotate(5deg);
+  }
+
+  100% {
+    transform: translateX(0) scaleX(1) rotate(0deg);
+  }
+}
+
+@keyframes monsterAttackForward {
+  0% {
+    transform: translateX(0) scaleX(-1) rotate(0deg);
+  }
+
+  20% {
+    transform: translateX(15px) scaleX(-0.9) rotate(5deg);
+  }
+
+  50% {
+    transform: translateX(-80px) scaleX(-1.2) rotate(-8deg);
+  }
+
+  70% {
+    transform: translateX(-70px) scaleX(-1.1) rotate(-5deg);
+  }
+
+  100% {
+    transform: translateX(0) scaleX(-1) rotate(0deg);
+  }
+}
+
+@keyframes heroHit {
+
+  0%,
+  100% {
+    transform: translateX(0);
+    filter: brightness(1);
+  }
+
+  20% {
+    transform: translateX(20px);
+    filter: brightness(3) saturate(0);
+  }
+
+  40% {
+    transform: translateX(-15px);
+  }
+
+  60% {
+    transform: translateX(10px);
+    filter: brightness(2);
+  }
+
+  80% {
+    transform: translateX(-5px);
+  }
+}
+
+
+@keyframes monsterHit {
+
+  0%,
+  100% {
+    transform: scaleX(-1) translateX(0);
+  }
+
+  20% {
+    transform: scaleX(-1) translateX(-20px);
+    filter: brightness(3) saturate(0);
+  }
+
+  40% {
+    transform: scaleX(-1) translateX(15px);
+  }
+
+  60% {
+    transform: scaleX(-1) translateX(-10px);
+    filter: brightness(2);
+  }
+
+  80% {
+    transform: scaleX(-1) translateX(5px);
+  }
+}
+
+@keyframes critFlash {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-20deg);
+  }
+
+  30% {
+    opacity: 1;
+    transform: scale(1.4) rotate(8deg);
+  }
+
+  60% {
+    opacity: 1;
+    transform: scale(1.1) rotate(-3deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.8) rotate(0) translateY(-60px);
+  }
+}
+
+@keyframes deathAnim {
+  0% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8) rotate(-30deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-90deg) translateY(50px);
+  }
+}
+
+/* ── Spell Effects ──────────────────────────────────── */
+@keyframes spellShot {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(200px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes monsterSpellShot {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(-200px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes groundShake {
+
+  0%,
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+
+  20% {
+    transform: translateX(-4px) translateY(-2px);
+  }
+
+  40% {
+    transform: translateX(4px) translateY(2px);
+  }
+
+  60% {
+    transform: translateX(-3px) translateY(-1px);
+  }
+
+  80% {
+    transform: translateX(3px) translateY(1px);
+  }
+}
+
+@keyframes battleEntry {
+  from {
+    opacity: 0;
+    transform: scale(0.3) translateY(60px) rotate(-15deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8) translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes xpBarFill {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes scoreCount {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fireFlicker {
+
+  0%,
+  100% {
+    transform: scaleY(1) scaleX(1);
+    opacity: 1;
+  }
+
+  25% {
+    transform: scaleY(1.1) scaleX(0.95);
+    opacity: 0.9;
+  }
+
+  50% {
+    transform: scaleY(0.95) scaleX(1.05);
+    opacity: 1;
+  }
+
+  75% {
+    transform: scaleY(1.05) scaleX(0.98);
+    opacity: 0.95;
+  }
+}
+
+@keyframes particleExplode {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(var(--tx), var(--ty)) scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes borderPulse {
+
+  0%,
+  100% {
+    border-color: rgba(239, 68, 68, 0.2);
+  }
+
+  50% {
+    border-color: rgba(239, 68, 68, 0.7);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+}
+
+@keyframes slideFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
+
+  70% {
+    transform: scale(0.9);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes healthDrain {
+  from {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(2) hue-rotate(20deg);
+  }
+
+  to {
+    filter: brightness(1);
+  }
+}
+
+@keyframes victoryPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 60px rgba(251, 191, 36, 0.8), 0 0 100px rgba(251, 191, 36, 0.4);
+  }
+}
+
+@keyframes defeatPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 60px rgba(239, 68, 68, 0.8), 0 0 100px rgba(239, 68, 68, 0.4);
+  }
+}
+
+@keyframes scanline {
+  from {
+    transform: translateY(-100vh);
+  }
+
+  to {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes glowPulse {
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
