@@ -55,11 +55,13 @@ def find_opponent(
         [data.topic]
     )
 
+    # In /find-opponent endpoint — remove correct_index from response
     questions = [
         {
-            "id": r[0], "body": r[1],
-            "options": json.loads(r[2]),
-            "correct_index": r[3],
+        "id":      r[0],
+        "body":    r[1],
+        "options": json.loads(r[2]),
+        # ← Do NOT include correct_index: r[3]
         }
         for r in result.rows
     ]
@@ -243,6 +245,7 @@ def _calculate_score(answers: list, conn) -> int:
             [ans["question_id"]]
         )
         if result.rows:
+            # Validate on backend only
             if result.rows[0][0] == ans["selected_index"]:
                 score += 1
     return score
