@@ -35,13 +35,11 @@
     "tailwindcss": "^4",
     "typescript": "^5"
   }
-
-  {
+,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   }
-}
 }
