@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: edurpg-api
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+```
+
+---
+
+### Fix 5 — Update Render Dashboard Settings
+
+Go to your Render service → **Settings** → **Environment**:
+
+Add this environment variable:
+```
+PYTHON_VERSION = 3.11.9
+```
+
+Then go to **Settings → Build & Deploy** and make sure:
+```
+Build Command:  pip install -r requirements.txt
+Start Command:  uvicorn app.main:app --host 0.0.0.0 --port $PORT
+Root Directory: backend
+```
+
+---
+
+### Fix 6 — Clear Render build cache
+
+On Render dashboard:
+```
+Settings → Build & Deploy → Clear build cache → Deploy
