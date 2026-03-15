@@ -1189,8 +1189,11 @@ copies or substantial portions of the Software.
 
 <div align="center">
 
-**Built with ❤️ for students who hate boring studying**
+**Built for students who hate boring studying**
 
-⚔️ [Play EduRPG](#) · 📖 [API Docs](http://localhost:8000/docs) · 🐛 [Report Bug](#)
 
+</div>
+
+<div>
+  **Contact: nnair7598@gmail.com**
 </div>
