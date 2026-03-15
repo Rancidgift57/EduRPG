@@ -1195,6 +1195,6 @@ copies or substantial portions of the Software.
 </div>
 
 <div>
-  <b>Contact: nnair7598@gmail.com</b>
+  <b>Contact: nnair7598@gmail.com</b><br>
   <b>Thank You 🙏🙏</b>
 </div>
