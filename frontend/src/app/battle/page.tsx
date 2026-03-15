@@ -436,7 +436,12 @@ export default function BattlePage() {
                 { session_id: session.id, selected_index: idx, question_id: question.id },
                 { headers: { Authorization: `Bearer ${token}` } });
             const r = res.data;
-            setLastResult({ ...r, selected_index: idx });
+            setLastResult({
+                ...r,
+                selected_index: idx,
+                correct_index: r.correct_index,   // ← from backend
+                explanation: r.explanation,      // ← from backend
+            });
             setPlayerHP(r.player_hp); setMonsterHP(r.monster_hp);
 
             if (r.action === "hero_attack") {
@@ -751,7 +756,7 @@ export default function BattlePage() {
                                 let col = "#d1d5db";
                                 let shadow = "none";
                                 if (answered) {
-                                    if (i === question.correct_index) { bg = "rgba(34,197,94,0.14)"; border = "rgba(74,222,128,0.52)"; col = "#86efac"; shadow = "0 0 14px rgba(34,197,94,0.3)"; }
+                                    if (i === lastResult.correct_index) { bg = "rgba(34,197,94,0.14)"; border = "rgba(74,222,128,0.52)"; col = "#86efac"; shadow = "0 0 14px rgba(34,197,94,0.3)"; }
                                     else if (lastResult && !lastResult.is_correct && i === lastResult.selected_index) { bg = "rgba(239,68,68,0.14)"; border = "rgba(248,113,113,0.52)"; col = "#fca5a5"; shadow = "0 0 14px rgba(239,68,68,0.3)"; }
                                     else { bg = "rgba(0,0,0,0.18)"; border = "rgba(255,255,255,0.03)"; col = "#374151"; }
                                 }
