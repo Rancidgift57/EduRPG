@@ -50,19 +50,19 @@ def calc_monster_damage(attack_power: int, defense: int, skill: Optional[str] = 
         reduction += 0.5
     return max(1, int(attack_power * (1 - reduction)))
 
+# backend/app/routers/battle.py
+
 def get_question(conn, topic: str, difficulty: int = 1) -> Optional[dict]:
-    # ✅ Use .rows instead of .fetchone()
     result = conn.execute(
-        """SELECT id, body, options_json, correct_index, explanation
+        """SELECT id, body, options_json
            FROM questions
            WHERE topic = ? AND difficulty <= ?
            ORDER BY RANDOM() LIMIT 1""",
         [topic, difficulty]
     )
     if not result.rows:
-        # Fallback — try any question for this topic ignoring difficulty
         result = conn.execute(
-            """SELECT id, body, options_json, correct_index, explanation
+            """SELECT id, body, options_json
                FROM questions
                WHERE topic = ?
                ORDER BY RANDOM() LIMIT 1""",
@@ -73,12 +73,13 @@ def get_question(conn, topic: str, difficulty: int = 1) -> Optional[dict]:
 
     row = result.rows[0]
     options = json.loads(row[2]) if isinstance(row[2], str) else row[2]
+
     return {
-        "id":            row[0],
-        "body":          row[1],
-        "options":       options,
-        "correct_index": row[3],
-        "explanation":   row[4] or "",
+        "id":      row[0],
+        "body":    row[1],
+        "options": options,
+        # ← NO correct_index
+        # ← NO explanation
     }
 
 def get_monster_topic(conn, monster_id: str) -> str:
@@ -174,8 +175,19 @@ def get_question_endpoint(
 
 
 # ─── Submit Answer ────────────────────────────────────────
+# backend/app/routers/battle.py
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from fastapi import Request
+
+limiter = Limiter(key_func=get_remote_address)
+
+
+
 @router.post("/answer")
+@limiter.limit("30/minute") 
 def submit_answer(
+    request: Request,          # ← add this
     data: AnswerRequest,
     current_user=Depends(get_current_user),
     conn=Depends(get_db)
@@ -198,33 +210,30 @@ def submit_answer(
 
     topic = get_monster_topic(conn, session.monster_id)
 
-    # Validate answer against question_id if provided
+    # ── Validate answer on backend only ──────────────────────
     is_correct  = False
     explanation = ""
 
     if data.question_id:
-        # ✅ Use .rows instead of .fetchone()
         result = conn.execute(
             "SELECT correct_index, explanation FROM questions WHERE id = ?",
             [data.question_id]
         )
         if result.rows:
-            row         = result.rows[0]
-            is_correct  = data.selected_index == row[0]
-            explanation = row[1] or ""
+            correct_index = result.rows[0][0]
+            explanation   = result.rows[0][1] or ""
+            is_correct    = (data.selected_index == correct_index)
+        else:
+            # Question ID not found — treat as wrong answer
+            is_correct = False
     else:
-        # Fallback — get any question for topic to validate
-        result = conn.execute(
-            """SELECT correct_index, explanation FROM questions
-               WHERE topic = ? ORDER BY RANDOM() LIMIT 1""",
-            [topic]
+        # No question_id provided — reject the submission
+        raise HTTPException(
+            status_code=400,
+            detail="question_id is required"
         )
-        if result.rows:
-            row         = result.rows[0]
-            is_correct  = data.selected_index == row[0]
-            explanation = row[1] or ""
 
-    # Record answer
+    # ── Record and process ────────────────────────────────────
     battle_repo.record_answer(data.session_id, is_correct)
 
     player_hp  = session.player_hp
@@ -256,7 +265,6 @@ def submit_answer(
         result_str = "victory" if monster_defeated else "defeat"
 
         if monster_defeated:
-            # ✅ Use .rows instead of .fetchone()
             m_result = conn.execute(
                 "SELECT xp_reward, is_boss FROM monsters WHERE id = ?",
                 [session.monster_id]
@@ -270,15 +278,15 @@ def submit_answer(
 
         stats = battle_repo.end_session(data.session_id, result_str, xp_gained)
 
-        # Award XP
         user = user_repo.get_by_id(current_user["id"])
         new_xp    = user.xp + xp_gained
         new_level = max(1, int(math.sqrt(new_xp / 100)))
         leveled_up = new_level > user.level
         user_repo.update_xp_and_level(current_user["id"], new_xp, new_level)
-        user_repo.add_xp_log(current_user["id"], xp_gained,
-            "monster_defeat" if monster_defeated else "battle_loss")
-
+        user_repo.add_xp_log(
+            current_user["id"], xp_gained,
+            "monster_defeat" if monster_defeated else "battle_loss"
+        )
         hero_repo.increment_usage(current_user["id"], hero.id)
 
         return {
@@ -301,10 +309,10 @@ def submit_answer(
             },
             "leveled_up":  leveled_up,
             "new_level":   new_level,
+            # ← Only send explanation AFTER answering, and only if wrong
             "explanation": explanation if not is_correct else "",
         }
 
-    # Battle continues — next question
     next_question = get_question(conn, topic)
 
     return {
@@ -316,6 +324,7 @@ def submit_answer(
         "player_hp":     player_hp,
         "monster_hp":    monster_hp,
         "battle_over":   False,
+        # ← Explanation only sent if wrong, never before
         "explanation":   explanation if not is_correct else "",
         "next_question": next_question,
     }
