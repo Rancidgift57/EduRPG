@@ -211,8 +211,10 @@ def submit_answer(
     topic = get_monster_topic(conn, session.monster_id)
 
     # ── Validate answer on backend only ──────────────────────
-    is_correct  = False
-    explanation = ""
+    # At the top of the validation section, declare it:
+    correct_index = -1
+    is_correct    = False
+    explanation   = ""
 
     if data.question_id:
         result = conn.execute(
@@ -220,12 +222,11 @@ def submit_answer(
             [data.question_id]
         )
         if result.rows:
-            correct_index = result.rows[0][0]
+            correct_index = result.rows[0][0]   # ← store it
             explanation   = result.rows[0][1] or ""
             is_correct    = (data.selected_index == correct_index)
-        else:
-            # Question ID not found — treat as wrong answer
-            is_correct = False
+
+# Then in BOTH return statements add:
     else:
         # No question_id provided — reject the submission
         raise HTTPException(
@@ -292,6 +293,7 @@ def submit_answer(
         return {
             "action":           action,
             "is_correct":       is_correct,
+            "correct_index": correct_index,
             "damage":           damage,
             "is_critical":      is_crit,
             "xp_gained":        xp_gained,
@@ -318,6 +320,7 @@ def submit_answer(
     return {
         "action":        action,
         "is_correct":    is_correct,
+        "correct_index": correct_index,
         "damage":        damage,
         "is_critical":   is_crit,
         "xp_gained":     xp_gained,
