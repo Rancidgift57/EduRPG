@@ -751,25 +751,81 @@ export default function BattlePage() {
                         <p style={{ fontSize: 16, lineHeight: 1.7, color: "#e2e8f0", marginBottom: 20, fontWeight: 500 }}>{question.body}</p>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
                             {question.options?.map((opt: string, i: number) => {
-                                let bg = "rgba(255,255,255,0.025)";
-                                let border = "rgba(255,255,255,0.07)";
+                                let bg = "rgba(255,255,255,.025)";
+                                let border = "rgba(255,255,255,.07)";
                                 let col = "#d1d5db";
                                 let shadow = "none";
-                                if (answered) {
-                                    if (i === lastResult.correct_index) { bg = "rgba(34,197,94,0.14)"; border = "rgba(74,222,128,0.52)"; col = "#86efac"; shadow = "0 0 14px rgba(34,197,94,0.3)"; }
-                                    else if (lastResult && !lastResult.is_correct && i === lastResult.selected_index) { bg = "rgba(239,68,68,0.14)"; border = "rgba(248,113,113,0.52)"; col = "#fca5a5"; shadow = "0 0 14px rgba(239,68,68,0.3)"; }
-                                    else { bg = "rgba(0,0,0,0.18)"; border = "rgba(255,255,255,0.03)"; col = "#374151"; }
+
+                                // ✅ Guard: only run coloring logic when BOTH answered AND lastResult exist
+                                if (answered && lastResult !== null && lastResult !== undefined) {
+                                    // ✅ Safe to read correct_index now
+                                    const ci = lastResult.correct_index ?? -1;
+
+                                    if (ci !== -1 && i === ci) {
+                                        bg = "rgba(34,197,94,.14)";
+                                        border = "rgba(74,222,128,.5)";
+                                        col = "#86efac";
+                                        shadow = "0 0 12px rgba(34,197,94,.3)";
+                                    } else if (!lastResult.is_correct && i === lastResult.selected_index) {
+                                        bg = "rgba(239,68,68,.14)";
+                                        border = "rgba(248,113,113,.5)";
+                                        col = "#fca5a5";
+                                        shadow = "0 0 12px rgba(239,68,68,.3)";
+                                    } else {
+                                        bg = "rgba(0,0,0,.18)";
+                                        border = "rgba(255,255,255,.03)";
+                                        col = "#374151";
+                                        shadow = "none";
+                                    }
                                 }
+
                                 return (
-                                    <button key={i} onClick={() => !answered && handleAnswer(i)} disabled={answered}
-                                        onMouseEnter={e => { if (!answered) { e.currentTarget.style.background = "rgba(124,58,237,0.1)"; e.currentTarget.style.borderColor = "rgba(168,85,247,0.45)"; e.currentTarget.style.transform = "scale(1.02)translateY(-1px)"; } }}
-                                        onMouseLeave={e => { if (!answered) { e.currentTarget.style.background = bg; e.currentTarget.style.borderColor = border; e.currentTarget.style.transform = "scale(1)"; } }}
+                                    <button
+                                        key={i}
+                                        onClick={() => !answered && handleAnswer(i)}
+                                        disabled={answered}
+                                        onMouseEnter={e => {
+                                            if (!answered) {
+                                                e.currentTarget.style.background = "rgba(124,58,237,.1)";
+                                                e.currentTarget.style.borderColor = "rgba(168,85,247,.45)";
+                                                e.currentTarget.style.transform = "scale(1.02)";
+                                            }
+                                        }}
+                                        onMouseLeave={e => {
+                                            if (!answered) {
+                                                e.currentTarget.style.background = bg;
+                                                e.currentTarget.style.borderColor = border;
+                                                e.currentTarget.style.transform = "scale(1)";
+                                            }
+                                        }}
                                         style={{
-                                            background: bg, border: `1px solid ${border}`, borderRadius: 13, padding: "15px 16px",
-                                            color: col, cursor: answered ? "not-allowed" : "pointer", textAlign: "left", fontSize: 13,
-                                            fontFamily: "Rajdhani", fontWeight: 600, transition: "all 0.2s", boxShadow: shadow
+                                            background: bg,
+                                            border: `1px solid ${border}`,
+                                            borderRadius: 12,
+                                            padding: "clamp(11px,3vw,14px) clamp(12px,3vw,16px)",
+                                            color: col,
+                                            cursor: answered ? "not-allowed" : "pointer",
+                                            textAlign: "left",
+                                            fontSize: "clamp(12px,3.2vw,14px)",
+                                            fontFamily: "Rajdhani",
+                                            fontWeight: 600,
+                                            transition: "all .2s",
+                                            boxShadow: shadow,
+                                            minHeight: 48,
+                                        }}
+                                    >
+                                        <span style={{
+                                            // ✅ Safe optional chain — won't crash if lastResult is null
+                                            color: (answered && lastResult?.correct_index === i)
+                                                ? "#4ade80"
+                                                : "#6b7280",
+                                            fontWeight: 800,
+                                            marginRight: 7,
+                                            fontFamily: "Cinzel",
+                                            fontSize: "clamp(10px,2.5vw,12px)",
                                         }}>
-                                        <span style={{ color: answered && i === question.correct_index ? "#4ade80" : "#6b7280", fontWeight: 800, marginRight: 8, fontFamily: "Cinzel", fontSize: 12 }}>{["A", "B", "C", "D"][i]}</span>
+                                            {["A", "B", "C", "D"][i]}
+                                        </span>
                                         {opt}
                                     </button>
                                 );
