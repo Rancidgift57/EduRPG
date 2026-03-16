@@ -831,16 +831,26 @@ export default function BattlePage() {
                                 );
                             })}
                         </div>
-                        {answered && lastResult && !lastResult.is_correct && question.explanation && (
-                            <div style={{
-                                marginTop: 14, padding: "13px 16px",
-                                backgroundImage: "linear-gradient(135deg,rgba(234,179,8,0.07),rgba(217,119,6,0.05))",
-                                border: "1px solid rgba(234,179,8,0.24)", borderRadius: 12,
-                                fontSize: 13, color: "#fde68a", lineHeight: 1.65, animation: "fadeSlideIn 0.3s ease-out"
-                            }}>
-                                💡 <strong>Tip:</strong> {question.explanation}
-                            </div>
-                        )}
+                        {/* ✅ All three conditions checked before reading .explanation */}
+                        {answered
+                            && lastResult !== null
+                            && lastResult !== undefined
+                            && !lastResult.is_correct
+                            && lastResult.explanation
+                            && (
+                                <div style={{
+                                    marginTop: 12,
+                                    padding: "clamp(10px,2.5vw,13px) clamp(12px,3vw,16px)",
+                                    backgroundImage: "linear-gradient(135deg,rgba(234,179,8,.07),rgba(217,119,6,.04))",
+                                    border: "1px solid rgba(234,179,8,.22)",
+                                    borderRadius: 11,
+                                    fontSize: "clamp(11px,3vw,13px)",
+                                    color: "#fde68a",
+                                    lineHeight: 1.65,
+                                }}>
+                                    💡 <strong>Tip:</strong> {lastResult.explanation}
+                                </div>
+                            )}
                     </div>
                 )}
             </div>
