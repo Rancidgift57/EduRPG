@@ -1,27 +1,65 @@
-import { useEffect, useRef, useCallback } from 'react';
+// hooks/useBattle.ts
+import { useCallback } from 'react';
+import axios from 'axios';
 import { useBattleStore } from '../store/battleStore';
 
+const API = process.env.NEXT_PUBLIC_API_URL;
+
 export function useBattle(sessionId: string) {
-    const wsRef = useRef<WebSocket | null>(null);
-    const { setBattleState, addBattleEvent } = useBattleStore();
+    const { setPlayerHP, setMonsterHP, setCurrentQuestion, setLastEvent } = useBattleStore();
 
-    useEffect(() => {
-        wsRef.current = new WebSocket(
-            `ws://localhost:8000/battle/ws/${sessionId}`
-        );
+    const token = typeof window !== 'undefined'
+        ? localStorage.getItem('token') || ''
+        : '';
 
-        wsRef.current.onmessage = (e) => {
-            const result = JSON.parse(e.data);
-            setBattleState(result);
-            addBattleEvent(result);  // triggers animation
-        };
+    // ✅ Accept number — matches QuizCard's onAnswer signature
+    const submitAnswer = useCallback(async (
+        selectedIndex: number,
+        skill?: string
+    ) => {
+        if (!sessionId) return;
 
-        return () => wsRef.current?.close();
-    }, [sessionId]);
+        const store = useBattleStore.getState();
+        const question = store.currentQuestion;
+        if (!question) return;
 
-    const submitAnswer = useCallback((optionId: string, skill?: string) => {
-        wsRef.current?.send(JSON.stringify({ optionId, skill }));
-    }, []);
+        try {
+            const res = await axios.post(
+                `${API}/battle/answer`,
+                {
+                    session_id: sessionId,
+                    selected_index: selectedIndex,   // ← number, matches backend
+                    question_id: question.id,
+                    skill: skill ?? null,
+                },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            const r = res.data;
+            setPlayerHP(r.player_hp);
+            setMonsterHP(r.monster_hp);
+
+            if (r.next_question) {
+                setCurrentQuestion(r.next_question);
+            }
+
+            setLastEvent({
+                is_correct: r.is_correct,
+                correct_index: r.correct_index ?? -1,
+                selected_index: selectedIndex,
+                damage: r.damage ?? 0,
+                is_critical: r.is_critical ?? false,
+                explanation: r.explanation ?? '',
+                xp_gained: r.xp_gained ?? 0,
+                action: r.action ?? '',
+                battle_over: r.battle_over ?? false,
+                result: r.result ?? '',
+            });
+
+        } catch (e) {
+            console.error('submitAnswer error:', e);
+        }
+    }, [sessionId, token]);
 
     return { submitAnswer };
 }
