@@ -30,6 +30,7 @@ interface Star {
 }
 
 // ─── Hero config ──────────────────────────────────────────────────────
+
 const HERO_CONFIG: Record<string, {
   emoji: string;
   color: string;
@@ -54,6 +55,14 @@ const HERO_CONFIG: Record<string, {
     accent: "#a855f7",
     attackEmoji: "✨",
   },
+  archer: {
+    emoji: "🏹",
+    color: "#34d399",
+    glow: "rgba(52,211,153,0.6)",
+    bg: "linear-gradient(135deg,#062318,#0d3d26)",
+    accent: "#10b981",
+    attackEmoji: "🎯",
+  },
   ninja: {
     emoji: "🥷",
     color: "#4ade80",
@@ -77,6 +86,38 @@ const HERO_CONFIG: Record<string, {
     bg: "linear-gradient(135deg,#2e0c0c,#5f1a1a)",
     accent: "#ef4444",
     attackEmoji: "⚡",
+  },
+  druid: {
+    emoji: "🌿",
+    color: "#86efac",
+    glow: "rgba(134,239,172,0.6)",
+    bg: "linear-gradient(135deg,#0c2a12,#164b1e)",
+    accent: "#22c55e",
+    attackEmoji: "🍃",
+  },
+  berserker: {
+    emoji: "🪓",
+    color: "#fb923c",
+    glow: "rgba(251,146,60,0.6)",
+    bg: "linear-gradient(135deg,#2e1200,#5c2800)",
+    accent: "#ea580c",
+    attackEmoji: "💢",
+  },
+  oracle: {
+    emoji: "🔯",
+    color: "#e879f9",
+    glow: "rgba(232,121,249,0.6)",
+    bg: "linear-gradient(135deg,#2a0c3a,#4a1460)",
+    accent: "#d946ef",
+    attackEmoji: "🌙",
+  },
+  titan: {
+    emoji: "👑",
+    color: "#ffd700",
+    glow: "rgba(255,215,0,0.7)",
+    bg: "linear-gradient(135deg,#1a1500,#3a2e00)",
+    accent: "#eab308",
+    attackEmoji: "☄️",
   },
 };
 
@@ -374,9 +415,14 @@ export default function HomePage() {
       setHeroes([
         { id: "1", name: "Samurai", subject: "Mathematics", attack_power: 25, defense: 12, max_hp: 110, skill_name: "double_strike", sprite_key: "samurai", unlock_level: 1 },
         { id: "2", name: "Wizard", subject: "Programming", attack_power: 30, defense: 8, max_hp: 90, skill_name: "hint_spell", sprite_key: "wizard", unlock_level: 1 },
-        { id: "3", name: "Ninja", subject: "Science", attack_power: 22, defense: 15, max_hp: 100, skill_name: "shadow_dodge", sprite_key: "ninja", unlock_level: 5 },
-        { id: "4", name: "Knight", subject: "History", attack_power: 18, defense: 20, max_hp: 130, skill_name: "iron_shield", sprite_key: "knight", unlock_level: 8 },
-        { id: "5", name: "Robot", subject: "AI Technology", attack_power: 28, defense: 10, max_hp: 95, skill_name: "data_scan", sprite_key: "robot", unlock_level: 12 },
+        { id: "3", name: "Archer", subject: "Science", attack_power: 22, defense: 11, max_hp: 105, skill_name: "precise_shot", sprite_key: "archer", unlock_level: 1 },
+        { id: "4", name: "Ninja", subject: "Chemistry", attack_power: 28, defense: 15, max_hp: 100, skill_name: "shadow_dodge", sprite_key: "ninja", unlock_level: 4 },
+        { id: "5", name: "Knight", subject: "History", attack_power: 18, defense: 22, max_hp: 140, skill_name: "iron_shield", sprite_key: "knight", unlock_level: 6 },
+        { id: "6", name: "Robot", subject: "AI Tech", attack_power: 32, defense: 10, max_hp: 95, skill_name: "data_scan", sprite_key: "robot", unlock_level: 9 },
+        { id: "7", name: "Druid", subject: "Biology", attack_power: 20, defense: 14, max_hp: 120, skill_name: "nature_heal", sprite_key: "druid", unlock_level: 11 },
+        { id: "8", name: "Berserker", subject: "Physics", attack_power: 40, defense: 5, max_hp: 85, skill_name: "rage_mode", sprite_key: "berserker", unlock_level: 14 },
+        { id: "9", name: "Oracle", subject: "Philosophy", attack_power: 24, defense: 16, max_hp: 115, skill_name: "foresight", sprite_key: "oracle", unlock_level: 17 },
+        { id: "10", name: "Titan", subject: "All Subjects", attack_power: 35, defense: 20, max_hp: 160, skill_name: "titan_force", sprite_key: "titan", unlock_level: 20 },
       ]);
     } finally {
       setPageLoading(false);
@@ -417,7 +463,9 @@ export default function HomePage() {
     }
   };
 
-  const cfg = selected ? (HERO_CONFIG[selected.sprite_key] || HERO_CONFIG.wizard) : null;
+  // Replace your existing cfg function with this:
+  const cfg = (hero: any) =>
+    HERO_CONFIG[hero?.sprite_key] ?? HERO_CONFIG.wizard;
   const monsterEmoji = topic ? (MONSTER_EMOJIS[topic] || "👹") : "👹";
 
   if (pageLoading) return (
@@ -533,6 +581,7 @@ export default function HomePage() {
               <NavBtn label="🏆 Leaderboard" onClick={() => router.push("/leaderboard")} />
               <NavBtn label="📚 Training" onClick={() => router.push("/training")} />
               <NavBtn label="⚔️ Multiplayer" onClick={() => router.push("/multiplayer")} />
+              <NavBtn label="🛡️ Clan" onClick={() => router.push("/clan")} />
               <div style={{
                 display: "flex", alignItems: "center", gap: 10,
                 background: "rgba(88,28,135,0.3)",
@@ -643,7 +692,7 @@ export default function HomePage() {
             <div style={{ marginBottom: 48, animation: "fadeSlideIn 0.5s ease-out" }}>
               <BattleArena
                 hero={selected}
-                cfg={cfg!}
+                cfg={HERO_CONFIG[selected.sprite_key] ?? HERO_CONFIG.wizard}
                 monsterEmoji={monsterEmoji}
                 topic={topic}
                 heroHP={heroHP}
@@ -669,7 +718,7 @@ export default function HomePage() {
                   🎯 SELECT BATTLE TOPIC
                 </div>
                 <p style={{ color: "#6b7280", marginTop: 10, fontSize: 14 }}>
-                  Who will <span style={{ color: cfg?.color, fontWeight: 700 }}>{selected.name}</span> face in combat?
+                  Who will <span style={{ color: cfg(selected)?.color, fontWeight: 700 }}>{selected.name}</span> face in combat?
                 </p>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
@@ -806,6 +855,19 @@ function HeroCard({ hero, cfg, locked, isActive, idx, onClick }: {
         fontFamily: "Rajdhani",
       }}
     >
+      {hero.unlock_level <= 1
+        ? <div style={{
+          position: "absolute", top: 6, left: 6, background: "rgba(34,197,94,.25)",
+          borderRadius: 6, padding: "2px 7px", fontSize: 9, color: "#4ade80",
+          border: "1px solid rgba(34,197,94,.4)", fontWeight: 700
+        }}>FREE</div>
+        : locked && <div style={{
+          position: "absolute", top: 6, right: 6,
+          background: "rgba(0,0,0,.7)", borderRadius: 6, padding: "2px 6px",
+          fontSize: 9, color: "#6b7280", border: "1px solid rgba(255,255,255,.1)"
+        }}>
+          🔒 Lv.{hero.unlock_level}</div>
+      }
       {/* Glow bg */}
       {isActive && (
         <div style={{
