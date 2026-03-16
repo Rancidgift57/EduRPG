@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { HPBar } from './HPBar';
 import { QuizCard } from './QuizCard';
@@ -10,24 +10,38 @@ export function BattleArena({ sessionId }: { sessionId: string }) {
     const { submitAnswer } = useBattle(sessionId);
     const { playerHP, monsterHP, currentQuestion, lastEvent } = useBattleStore();
 
-    // Initialize Three.js scene
+
     useEffect(() => {
+
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(800, 450);
         canvasRef.current?.appendChild(renderer.domElement);
-
-        // Load hero + monster sprites
-        // ... Three.js setup
         camera.position.z = 5;
+
         const animate = () => {
             requestAnimationFrame(animate);
             renderer.render(scene, camera);
         };
         animate();
+
         return () => renderer.dispose();
     }, []);
+
+
+
+    useEffect(() => {
+        setAnswered(false);
+    }, [currentQuestion?.id]);
+
+
+    const [answered, setAnswered] = useState(false);
+    const handleAnswer = (index: number) => {
+        setAnswered(true);
+        submitAnswer(index);
+    };
+    // ✅ Bridge function — converts number index to what submitAnswer expects
 
     return (
         <div className='battle-arena'>
@@ -36,7 +50,12 @@ export function BattleArena({ sessionId }: { sessionId: string }) {
                 <HPBar label='Monster' current={monsterHP} max={100} color='red' />
             </div>
             <div ref={canvasRef} className='battle-canvas' />
-            <QuizCard question={currentQuestion} onAnswer={submitAnswer} />
+            <QuizCard
+                question={currentQuestion}
+                onAnswer={handleAnswer}
+                answered={answered}
+                lastEvent={lastEvent}
+            />
         </div>
     );
 }
