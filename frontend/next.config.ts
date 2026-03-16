@@ -1,12 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
+  // ✅ Force Webpack — Turbopack panics on Windows with large SVG files
+  webpack(config) {
+    return config;
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // ✅ Valid Next.js 16 options only
   turbopack: {},
 };
 
