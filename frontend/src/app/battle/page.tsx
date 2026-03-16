@@ -398,7 +398,17 @@ export default function BattlePage() {
     const [monsterMaxHP, setMonsterMaxHP] = useState(100);
     const [question, setQuestion] = useState<any>(null);
     const [answered, setAnswered] = useState(false);
-    const [lastResult, setLastResult] = useState<any>(null);
+    // Replace your existing useState for lastResult with this:
+    const [lastResult, setLastResult] = useState<{
+        is_correct: boolean;
+        is_critical: boolean;
+        selected_index: number;
+        correct_index: number;    // ← always a number, never undefined
+        explanation: string;    // ← always a string, never undefined
+        damage: number;
+        action: string;
+        xp_gained: number;
+    } | null>(null);
     const [battleOver, setBattleOver] = useState(false);
     const [battleResult, setBattleResult] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -431,18 +441,29 @@ export default function BattlePage() {
     const handleAnswer = async (idx: number) => {
         if (answered || !session || !question) return;
         setAnswered(true);
+
         try {
-            const res = await axios.post(`${API}/battle/answer`,
+            const res = await axios.post(
+                `${API}/battle/answer`,
                 { session_id: session.id, selected_index: idx, question_id: question.id },
-                { headers: { Authorization: `Bearer ${token}` } });
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
             const r = res.data;
+
+            // ✅ Always provide every field — never leave any as undefined
             setLastResult({
-                ...r,
+                is_correct: r.is_correct ?? false,
+                is_critical: r.is_critical ?? false,
                 selected_index: idx,
-                correct_index: r.correct_index,   // ← from backend
-                explanation: r.explanation,      // ← from backend
+                correct_index: r.correct_index ?? -1,   // ← -1 means unknown, never crash
+                explanation: r.explanation ?? "",
+                damage: r.damage ?? 0,
+                action: r.action ?? "",
+                xp_gained: r.xp_gained ?? 0,
             });
-            setPlayerHP(r.player_hp); setMonsterHP(r.monster_hp);
+
+            setPlayerHP(r.player_hp ?? playerHP);
+            setMonsterHP(r.monster_hp ?? monsterHP);
 
             if (r.action === "hero_attack") {
                 setHeroAnim("attack"); setSpellActive(true);
@@ -475,7 +496,10 @@ export default function BattlePage() {
                 if (r.next_question) setQuestion(r.next_question);
                 setAnswered(false); setLastResult(null); setLogMsg("⚔️ Next attack! Choose wisely...");
             }, r.is_correct ? 1400 : 2800);
-        } catch { setAnswered(false); }
+        } catch (e) {
+            setAnswered(false);
+            setLastResult(null);  // ← reset on error too
+        }
     };
 
     const heroColor = hero ? (HERO_COLORS[hero.sprite_key] || "#a855f7") : "#a855f7";
