@@ -663,3 +663,11 @@ function WarBattlePageContent() {
     </div>
   );
 }
+
+export default function WarBattlePage() {
+  return (
+    <Suspense fallback={<div style={{padding:40}}>Loading battle...</div>}>
+      <WarBattlePageContent />
+    </Suspense>
+  );
+}
