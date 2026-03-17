@@ -365,46 +365,64 @@ class MultiplayerRepository:
     def get_pending_defenses(self, user_id: str) -> list:
         """Battles where user needs to respond as defender"""
         result = self.client.execute(
-            """SELECT mb.*, u.username as attacker_name
-           FROM multiplayer_battles mb
-           JOIN users u ON mb.attacker_id = u.id
-           WHERE mb.defender_id = ?
-           AND mb.status = 'attacker_done'
-           ORDER BY mb.created_at DESC""",
+            """SELECT 
+                mb.id,
+                mb.attacker_id,
+                mb.defender_id,
+                mb.questions,
+                mb.status,
+                mb.attacker_score,
+                mb.defender_score,
+                mb.winner_id,
+                mb.trophies_wagered,
+                mb.trophies_transferred,
+                mb.created_at,
+                mb.expires_at,
+                u.username as attacker_name
+            FROM multiplayer_battles mb
+            JOIN users u ON mb.attacker_id = u.id
+            WHERE mb.defender_id = ? 
+            AND mb.status = 'attacker_done'
+            ORDER BY mb.created_at DESC""",
             [user_id]
         )
 
         import json
-
         battles = []
 
         for r in result.rows:
-            question_ids = json.loads(r[3]) if r[3] else []  # attacker_questions
+            try:
+            # Parse questions safely
+                raw_questions = r[3]  # now guaranteed to be mb.questions
+                if isinstance(raw_questions, str):
+                    questions = json.loads(raw_questions)
+                elif isinstance(raw_questions, list):
+                    questions = raw_questions  # already parsed
+                else:
+                    print(f"[WARN] Unexpected questions type for battle {r[0]}: {type(raw_questions)}")
+                    questions = []
 
-            questions = []
-            for qid in question_ids:
-                q = self.client.execute(
-                    "SELECT id, body, options_json FROM questions WHERE id = ?",
-                    [qid]
-                )
-                if q.rows:
-                    row = q.rows[0]
-                    questions.append({
-                        "id": row[0],
-                        "body": row[1],
-                        "options": json.loads(row[2])
-                    })
+                battles.append({
+                    "id": r[0],
+                    "attacker_id": r[1],
+                    "defender_id": r[2],
+                    "questions": questions,
+                    "status": r[4],
+                    "attacker_score": r[5],
+                    "defender_score": r[6],
+                    "winner_id": r[7],
+                    "trophies_wagered": r[8],
+                    "trophies_transferred": r[9],
+                    "created_at": str(r[10]),
+                    "expires_at": str(r[11]),
+                    "attacker_name": r[12],
+                })
 
-            battles.append({
-                "id": r[0],
-                "attacker_id": r[1],
-                "questions": questions,  # now full question data
-                "trophies_wagered": r[11],
-                "expires_at": r[13],
-                "attacker_name": r[14],
-            })
+            except (json.JSONDecodeError, IndexError, TypeError) as e:
+                print(f"[ERROR] Failed to parse battle row: {e} | Row: {r}")
+                continue  # skip broken rows instead of crashing
 
-            return battles
+        return battles
 
     def get_leaderboard(self, limit: int = 50) -> list[dict]:
         result = self.client.execute(
