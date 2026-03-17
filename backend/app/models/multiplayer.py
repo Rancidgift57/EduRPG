@@ -379,7 +379,7 @@ class MultiplayerRepository:
         battles = []
 
         for r in result.rows:
-            question_ids = json.loads(r[3])  # attacker_questions
+            question_ids = json.loads(r[3]) if r[3] else []  # attacker_questions
 
             questions = []
             for qid in question_ids:
