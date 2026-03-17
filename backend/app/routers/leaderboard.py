@@ -37,6 +37,7 @@ def weekly_leaderboard(
     from datetime import datetime, timedelta
 
     # Get start of current week (Monday)
+    repo = UserRepository(conn)
     today = datetime.utcnow()
     week_start = (today - timedelta(days=today.weekday())).isoformat()
 
