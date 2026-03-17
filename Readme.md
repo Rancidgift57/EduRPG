@@ -14,7 +14,7 @@
 
 **Turn studying into an addictive RPG battle game. Defeat monsters by answering questions correctly.**
 
-[Live Demo](#) · [Backend API Docs](#api-documentation) · [Report Bug](#) · [Request Feature](#)
+[Live Demo](https://edu-rpg-six.vercel.app/) · [Backend API Docs](#api-documentation) · [Report Bug](#) · [Request Feature](#)
 
 </div>
 
