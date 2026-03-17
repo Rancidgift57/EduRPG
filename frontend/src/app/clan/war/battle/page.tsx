@@ -257,7 +257,7 @@ function WarArena({
 }
 
 // ── Main War Battle Page ──────────────────────────────────────────────
-export default function WarBattlePage() {
+function WarBattlePageContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const matchupId    = searchParams.get("matchup") || "";
