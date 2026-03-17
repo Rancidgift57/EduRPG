@@ -369,7 +369,7 @@ You do **NOT** need:
 #### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/edurpg.git
+git clone https://github.com/Rancidgift57/EduRPG.git
 cd edurpg
 ```
 
