@@ -40,6 +40,7 @@
   - [Monster System](#monster-system)
   - [XP & Level System](#xp--level-system)
   - [Multiplayer System](#multiplayer-system)
+  - [Clan War System](#clan-war-system)
   - [AI Tutor](#ai-tutor)
 - [Frontend Pages](#-frontend-pages)
 - [Deployment](#-deployment)
@@ -62,6 +63,7 @@ Traditional learning apps are boring. EduRPG combines:
 - **RPG mechanics** — heroes, monsters, HP bars, XP, levels, skills
 - **AI tutoring** — HuggingFace LLM explains wrong answers instantly
 - **Multiplayer** — Clash of Clans-style async PvP with trophy system
+- **Clan Wars** — Form study groups, battle rival clans in team quiz wars
 - **Curated content** — hand-picked YouTube videos per topic, no API keys needed
 - **Beautiful UI** — full-body SVG character animations, attack animations, damage floats
 
@@ -96,6 +98,19 @@ Students aged 15–25 learning STEM subjects: Mathematics, Science, Programming,
 | 👑 **League System** | Bronze → Silver → Gold → Diamond → Legend |
 | 📬 **Defense Inbox** | Get notified when someone attacks you, defend within 24 hours |
 | 🌍 **Matchmaking** | Find opponents within ±200 trophy range |
+
+### 🏰 Clan War Features
+
+| Feature | Description |
+|---------|-------------|
+| 🏰 **Clan Creation** | Create or join a clan (study group) of up to 15 members |
+| 👑 **Clan Leader** | Leader sets the war roster, assigns battle order, and chooses topics |
+| ⚔️ **Clan Wars** | Challenge rival clans to a quiz war — each member fights a 1v1 battle |
+| 📋 **Battle Order** | Leader decides who fights whom and in what sequence |
+| 🧮 **War Score** | Clan that wins more individual battles wins the war |
+| 🏅 **Clan XP & Trophies** | Clans earn collective XP and trophies — climb the Clan Leaderboard |
+| 📣 **Clan Chat** | In-clan messaging to coordinate strategy before wars |
+| 🛡️ **War History** | Full log of past wars — wins, losses, and member performance |
 
 ### Technical Features
 
@@ -176,6 +191,10 @@ UptimeRobot         — Keep-alive pinging (free)
 │   │         /multiplayer  (PvP System)               │            │
 │   │   Attack │  Inbox  │  Rankings  │  History       │            │
 │   └──────────────────────────────────────────────────┘            │
+│   ┌──────────────────────────────────────────────────┐            │
+│   │           /clans  (Clan War System)              │            │
+│   │  My Clan │ War Room │ Leaderboard │ War History  │            │
+│   └──────────────────────────────────────────────────┘            │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │ HTTPS / REST API calls (axios)
                            │
@@ -192,6 +211,10 @@ UptimeRobot         — Keep-alive pinging (free)
 │  │ Explain │  │ Global  │  │ PvP     │  │ Videos  │             │
 │  │ Hints   │  │ Weekly  │  │ Trophies│  │ Tips    │             │
 │  └─────────┘  └─────────┘  └─────────┘  └─────────┘             │
+│  ┌─────────────────────────────────────────────────┐             │
+│  │                   /clans                        │             │
+│  │  Create │ Join │ War Start │ Submit │ Results   │             │
+│  └─────────────────────────────────────────────────┘             │
 └──────┬──────────────────────────────────┬───────────────────────────┘
        │                                  │
        ▼                                  ▼
@@ -207,6 +230,10 @@ UptimeRobot         — Keep-alive pinging (free)
 │  xp_log      │                 │  → Give hints      │
 │  rankings    │                 └────────────────────┘
 │  achievements│
+│  clans       │
+│  clan_members│
+│  clan_wars   │
+│  war_battles │
 └──────────────┘
 ```
 
@@ -232,7 +259,8 @@ EduRPG/
 │   │   │   ├── heroes.py             ← GET/POST /heroes/*
 │   │   │   ├── leaderboard.py        ← GET /leaderboard/*
 │   │   │   ├── ai_tutor.py           ← POST /ai/explain, /hint
-│   │   │   └── multiplayer.py        ← POST /multiplayer/*
+│   │   │   ├── multiplayer.py        ← POST /multiplayer/*
+│   │   │   └── clans.py              ← POST/GET /clans/* (Clan Wars)
 │   │   │
 │   │   ├── models/                   ← Data models + DB operations
 │   │   │   ├── __init__.py
@@ -240,11 +268,13 @@ EduRPG/
 │   │   │   ├── hero.py               ← Hero + HeroRepository
 │   │   │   ├── monster.py            ← Monster + MonsterRepository
 │   │   │   ├── battle.py             ← BattleSession + BattleRepository
-│   │   │   └── multiplayer.py        ← MultiplayerBattle + Rankings
+│   │   │   ├── multiplayer.py        ← MultiplayerBattle + Rankings
+│   │   │   └── clan.py               ← Clan + ClanWar + WarBattle
 │   │   │
 │   │   ├── services/                 ← Business logic
 │   │   │   ├── battle_engine.py      ← Damage calc, crit hits, XP
-│   │   │   └── gamification.py       ← XP awards, level-ups, badges
+│   │   │   ├── gamification.py       ← XP awards, level-ups, badges
+│   │   │   └── clan_war_engine.py    ← War scoring, matchmaking, results
 │   │   │
 │   │   └── ai/
 │   │       └── gemini_tutor.py       ← HuggingFace AI tutor (renamed)
@@ -267,12 +297,18 @@ EduRPG/
 │   │   │   │   └── page.tsx          ← Training Room + Videos
 │   │   │   ├── leaderboard/
 │   │   │   │   └── page.tsx          ← Trophy Leaderboard
-│   │   │   └── multiplayer/
-│   │   │       ├── page.tsx          ← Multiplayer Hub
-│   │   │       ├── attack/
-│   │   │       │   └── page.tsx      ← Pick questions + attack
-│   │   │       └── inbox/
-│   │   │           └── page.tsx      ← Defend incoming attacks
+│   │   │   ├── multiplayer/
+│   │   │   │   ├── page.tsx          ← Multiplayer Hub
+│   │   │   │   ├── attack/
+│   │   │   │   │   └── page.tsx      ← Pick questions + attack
+│   │   │   │   └── inbox/
+│   │   │   │       └── page.tsx      ← Defend incoming attacks
+│   │   │   └── clans/
+│   │   │       ├── page.tsx          ← Clan Hub (create/join/manage)
+│   │   │       ├── war/
+│   │   │       │   └── page.tsx      ← War Room (active war view)
+│   │   │       └── leaderboard/
+│   │   │           └── page.tsx      ← Clan trophy leaderboard
 │   │   │
 │   │   ├── components/
 │   │   │   ├── battle/
@@ -281,8 +317,12 @@ EduRPG/
 │   │   │   │   └── QuizCard.tsx      ← Answer choices component
 │   │   │   ├── training/
 │   │   │   │   └── VideoPlayer.tsx   ← YouTube embed (hardcoded)
-│   │   │   └── ai/
-│   │   │       └── AITutorPanel.tsx  ← AI explanation panel
+│   │   │   ├── ai/
+│   │   │   │   └── AITutorPanel.tsx  ← AI explanation panel
+│   │   │   └── clans/
+│   │   │       ├── ClanCard.tsx      ← Clan info + stats card
+│   │   │       ├── WarRoster.tsx     ← Battle order assignment UI
+│   │   │       └── WarResultsPanel.tsx ← Win/loss breakdown per member
 │   │   │
 │   │   └── lib/
 │   │       └── videoDatabase.ts      ← Hardcoded YouTube video list
@@ -626,6 +666,74 @@ CREATE TABLE player_rankings (
 );
 ```
 
+### `clans` *(New — Clan War System)*
+```sql
+CREATE TABLE clans (
+    id           TEXT PRIMARY KEY,        -- UUID
+    name         TEXT UNIQUE NOT NULL,
+    tag          TEXT UNIQUE NOT NULL,    -- Short tag e.g. #EDURPG
+    description  TEXT,
+    leader_id    TEXT NOT NULL,           -- User ID of clan leader
+    max_members  INTEGER DEFAULT 15,
+    trophies     INTEGER DEFAULT 0,       -- Collective clan trophies
+    xp           INTEGER DEFAULT 0,       -- Collective clan XP
+    wins         INTEGER DEFAULT 0,
+    losses       INTEGER DEFAULT 0,
+    created_at   TEXT NOT NULL
+);
+```
+
+### `clan_members` *(New — Clan War System)*
+```sql
+CREATE TABLE clan_members (
+    id         TEXT PRIMARY KEY,
+    clan_id    TEXT NOT NULL,
+    user_id    TEXT NOT NULL,
+    role       TEXT DEFAULT 'member',     -- leader, co-leader, member
+    joined_at  TEXT NOT NULL,
+    wars_fought INTEGER DEFAULT 0,
+    war_wins    INTEGER DEFAULT 0,
+    UNIQUE(clan_id, user_id)
+);
+```
+
+### `clan_wars` *(New — Clan War System)*
+```sql
+CREATE TABLE clan_wars (
+    id               TEXT PRIMARY KEY,
+    clan_a_id        TEXT NOT NULL,       -- Challenging clan
+    clan_b_id        TEXT NOT NULL,       -- Defending clan
+    status           TEXT DEFAULT 'prep', -- prep/active/completed
+    clan_a_score     INTEGER DEFAULT 0,   -- Battles won by Clan A
+    clan_b_score     INTEGER DEFAULT 0,   -- Battles won by Clan B
+    winner_clan_id   TEXT,
+    topic            TEXT NOT NULL,       -- Topic set by leader for the war
+    war_size         INTEGER NOT NULL,    -- Number of battles (e.g. 5, 10, 15)
+    trophies_wagered INTEGER DEFAULT 50,
+    prep_ends_at     TEXT NOT NULL,       -- End of 24hr preparation phase
+    war_ends_at      TEXT NOT NULL,       -- 48hr window to complete all battles
+    created_at       TEXT NOT NULL
+);
+```
+
+### `war_battles` *(New — Clan War System)*
+```sql
+CREATE TABLE war_battles (
+    id              TEXT PRIMARY KEY,
+    war_id          TEXT NOT NULL,        -- Parent clan war
+    battle_order    INTEGER NOT NULL,     -- Position in war (1, 2, 3...)
+    clan_a_member   TEXT NOT NULL,        -- User ID assigned by Clan A leader
+    clan_b_member   TEXT NOT NULL,        -- User ID assigned by Clan B leader
+    topic           TEXT NOT NULL,        -- Battle topic (can override war topic)
+    clan_a_score    INTEGER DEFAULT 0,    -- Questions answered correctly
+    clan_b_score    INTEGER DEFAULT 0,
+    winner_user_id  TEXT,
+    status          TEXT DEFAULT 'pending', -- pending/active/completed
+    started_at      TEXT,
+    completed_at    TEXT
+);
+```
+
 ---
 
 ## 📡 API Documentation
@@ -792,6 +900,71 @@ Full interactive API docs available at `http://localhost:8000/docs` when running
 
 ---
 
+### Clan War Endpoints *(New)*
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/clans/create` | Create a new clan | Yes |
+| POST | `/clans/join/{clan_id}` | Join an existing clan | Yes |
+| POST | `/clans/leave` | Leave your current clan | Yes |
+| GET | `/clans/my-clan` | Get your clan details + members | Yes |
+| GET | `/clans/search` | Search clans by name or tag | No |
+| GET | `/clans/{clan_id}` | Get public clan profile | No |
+| POST | `/clans/promote/{user_id}` | Promote member to co-leader | Yes (leader) |
+| DELETE | `/clans/kick/{user_id}` | Remove a member from clan | Yes (leader) |
+| POST | `/clans/war/challenge/{clan_id}` | Challenge another clan to war | Yes (leader) |
+| POST | `/clans/war/set-roster` | Set war roster + battle order | Yes (leader) |
+| GET | `/clans/war/active` | Get current active war | Yes |
+| POST | `/clans/war/battle/start/{war_battle_id}` | Start your assigned war battle | Yes |
+| POST | `/clans/war/battle/answer` | Submit answer in a war battle | Yes |
+| GET | `/clans/war/{war_id}/results` | Get full war results | Yes |
+| GET | `/clans/war/history` | Get clan's past wars | Yes |
+| GET | `/clans/leaderboard` | Clan trophy leaderboard | No |
+
+**Create Clan Request:**
+```json
+{
+  "name": "Math Warriors",
+  "tag": "MATHW",
+  "description": "We grind calculus and conquer all"
+}
+```
+
+**Create Clan Response:**
+```json
+{
+  "clan_id": "uuid",
+  "name": "Math Warriors",
+  "tag": "#MATHW",
+  "leader_id": "uuid",
+  "members": 1,
+  "trophies": 0
+}
+```
+
+**Challenge Clan Request:**
+```json
+{
+  "opponent_clan_id": "uuid",
+  "topic": "calculus",
+  "war_size": 5
+}
+```
+
+**Set Roster Request (leader only):**
+```json
+{
+  "war_id": "uuid",
+  "roster": [
+    { "battle_order": 1, "member_user_id": "uuid-alice", "topic": "calculus" },
+    { "battle_order": 2, "member_user_id": "uuid-bob",   "topic": "algebra-basics" },
+    { "battle_order": 3, "member_user_id": "uuid-carol", "topic": "calculus" }
+  ]
+}
+```
+
+---
+
 ## ⚔️ Game Systems
 
 ### Battle System
@@ -879,6 +1052,8 @@ XP_TABLE = {
     "daily_login":     10,    # Daily login bonus
     "streak_3":       100,    # 3-day streak bonus
     "streak_7":       250,    # 7-day streak bonus
+    "war_battle_win": 100,    # Winning a war battle
+    "clan_war_win":   300,    # Your clan wins the war
 }
 
 # Level Formula
@@ -926,6 +1101,97 @@ Complete Flow:
 
 ---
 
+### 🏰 Clan War System *(New)*
+
+Clan Wars turn studying into a full team sport. Form a study group as a clan, challenge your rivals, and prove your crew knows the subject best.
+
+```
+Complete Clan War Flow:
+────────────────────────────────────────────────────────
+
+PHASE 0 — Setup
+───────────────
+1. Any user creates a clan (max 15 members)
+2. Members join via clan tag (e.g. #MATHW) or search
+3. Clan leader (or co-leader) manages the roster
+
+PHASE 1 — Challenge (Preparation, 24 hrs)
+──────────────────────────────────────────
+1. Leader opens /clans → clicks "Declare War"
+2. Searches for a rival clan (matched by similar clan trophies)
+3. Selects war size: 5v5, 10v10, or 15v15 battles
+4. Sets a primary topic (e.g. calculus) for the war
+5. Leader assigns the battle roster:
+   - Picks which members fight
+   - Sets the battle ORDER (who fights first, second, etc.)
+   - Optionally assigns a different topic per individual battle
+6. Both clans have 24 hours to finalize rosters
+   - Each side's leader sets their own roster independently
+   - Roster is hidden from the enemy until war starts
+
+PHASE 2 — War (Battle Window, 48 hrs)
+───────────────────────────────────────
+1. War goes ACTIVE — all assigned battles unlock simultaneously
+2. Each member logs in → sees their war assignment:
+   "You are Battle #3 — fight PlayerX from Clan Rivals!"
+3. They click START BATTLE → a 10-question quiz begins
+4. Standard battle rules apply (correct = points, wrong = opponent's points)
+5. Each battle concludes independently — no waiting on teammates
+6. War score updates live:
+   "Math Warriors: 3 wins | Rivals FC: 1 win"
+
+PHASE 3 — Results
+──────────────────
+1. War ends when all battles complete OR 48hr timer runs out
+2. Clan with most battle wins takes the war
+3. Trophies transfer: winning clan +50, losing clan -30
+4. Each member earns personal XP for their battle outcome
+5. Clan War History shows all past wars with per-member stats
+```
+
+**War Score Logic:**
+```python
+# Each war battle is a standalone 10-question quiz
+# Battle winner = player with more correct answers
+# Ties count as 0.5 wins for each side
+
+clan_a_score = sum(1 for b in battles if b.winner == "clan_a")
+clan_b_score = sum(1 for b in battles if b.winner == "clan_b")
+
+# Draws: each gets 0.5
+for b in battles:
+    if b.clan_a_score == b.clan_b_score:
+        clan_a_score += 0.5
+        clan_b_score += 0.5
+
+war_winner = "clan_a" if clan_a_score > clan_b_score else "clan_b"
+# Perfect war bonus: win all battles → extra +100 clan XP
+```
+
+**Clan Roles & Permissions:**
+
+| Role | Start War | Set Roster | Kick Members | Promote | Invite |
+|------|-----------|------------|--------------|---------|--------|
+| 👑 Leader | ✅ | ✅ | ✅ | ✅ | ✅ |
+| ⭐ Co-Leader | ✅ | ✅ | ✅ (members only) | ❌ | ✅ |
+| 🧑 Member | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+**Clan Trophy System:**
+```
+Clan War Win   → +50 clan trophies
+Clan War Loss  → -30 clan trophies
+Perfect War    → +25 bonus clan trophies (win all battles)
+
+Clan Leagues:
+0    - 299   → 🥉 Bronze Clan
+300  - 699   → 🥈 Silver Clan
+700  - 1499  → 🥇 Gold Clan
+1500 - 2999  → 💎 Diamond Clan
+3000+        → 👑 Legend Clan
+```
+
+---
+
 ### AI Tutor
 
 The AI tutor uses HuggingFace's free inference API with three models:
@@ -957,6 +1223,9 @@ Hardcoded: Local fallback questions             (if all AI down)
 | `/multiplayer` | Multiplayer Hub | Trophy count, attack button, battle history |
 | `/multiplayer/attack` | Attack Flow | Find opponent → pick questions → answer yours |
 | `/multiplayer/inbox` | Defense Inbox | Answer incoming attacks |
+| `/clans` | Clan Hub | Create/join clan, view roster, declare war |
+| `/clans/war` | War Room | Live war score, battle assignments, countdown timer |
+| `/clans/leaderboard` | Clan Leaderboard | Clan trophy rankings by league |
 
 ---
 
@@ -1074,6 +1343,9 @@ Post-deploy ──────────────────────�
 [ ] Multiplayer page loads
 [ ] Leaderboard shows rankings
 [ ] Training room videos play
+[ ] Clan creation works
+[ ] War declaration and roster assignment work
+[ ] War battles complete and scores update
 [ ] UptimeRobot monitor active
 ```
 
@@ -1095,6 +1367,9 @@ Post-deploy ──────────────────────�
 | `ChunkLoadError` (Next.js) | `<style jsx>` in App Router | Move CSS to `globals.css`, remove `<style jsx>` tags |
 | AI tutor returns empty | HuggingFace model loading | Wait 20s and retry — model is warming up (cold start) |
 | Battle gives 404 | Missing page files | Create `src/app/battle/page.tsx` etc. |
+| `clan_wars table not found` | DB not migrated after update | Re-run `python -m app.seed` or run migration script |
+| War roster returns 403 | Non-leader trying to set roster | Only leader/co-leader can call `/clans/war/set-roster` |
+| War battle shows wrong opponent | Roster set before opponent confirmed | Ensure both clans finalize roster before prep phase ends |
 
 ### Debug Commands
 
@@ -1107,6 +1382,9 @@ curl http://localhost:8000/heroes/
 
 # Check AI is working
 curl http://localhost:8000/ai/status
+
+# Check clan tables exist
+curl http://localhost:8000/clans/leaderboard
 
 # Check frontend builds
 cd frontend && npm run build
@@ -1146,10 +1424,12 @@ git push origin feature/your-feature-name
 - 🗡️ Add new hero classes with unique skills
 - 👹 Add new monsters with different attack patterns
 - 🎮 Add real-time multiplayer with WebSockets
+- 💬 Add real-time clan chat with WebSockets
 - 📊 Add teacher dashboard with class analytics
 - 🏅 Add more achievement badges
 - 📱 Build React Native mobile app
 - 🌐 Add multilingual support
+- 🏰 Add clan-exclusive dungeons unlocked only during wars
 
 ---
 
@@ -1190,7 +1470,6 @@ copies or substantial portions of the Software.
 <div align="center">
 
 **Built for students who hate boring studying**
-
 
 </div>
 
