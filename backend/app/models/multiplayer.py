@@ -363,7 +363,6 @@ class MultiplayerRepository:
         return row_to_battle(result.rows[0]) if result.rows else None
 
     def get_pending_defenses(self, user_id: str) -> list:
-        """Battles where user needs to respond as defender"""
         result = self.client.execute(
             """SELECT mb.*, u.username as attacker_name
                FROM multiplayer_battles mb
@@ -373,17 +372,23 @@ class MultiplayerRepository:
                ORDER BY mb.created_at DESC""",
             [user_id]
         )
+
         import json
-        return [
-            {
-                "id": r[0], "attacker_id": r[1],
-                "questions": json.loads(r[3]),
+        battles = []
+
+        for r in result.rows:
+            question_ids = json.loads(r[3]) if r[3] else []
+
+            battles.append({
+                "id": r[0],
+                "attacker_id": r[1],
+                "questions": question_ids,
                 "trophies_wagered": r[11],
                 "expires_at": r[13],
                 "attacker_name": r[14],
-            }
-            for r in result.rows
-        ]   
+            })
+
+        return battles   
 
     def get_leaderboard(self, limit: int = 50) -> list[dict]:
         result = self.client.execute(
