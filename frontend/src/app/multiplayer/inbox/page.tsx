@@ -392,12 +392,20 @@ export default function InboxPage() {
     useEffect(() => { loadInbox(); }, []);
 
     const loadInbox = async () => {
-        try {
-            const res = await axios.get(`${API}/multiplayer/inbox`, { headers });
-            setBattles(res.data.pending_battles || []);
-        } catch { }
-        finally { setLoading(false); }
-    };
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await axios.get(`${API}/multiplayer/inbox`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    setBattles(res.data.pending_battles || []);
+  } finally {
+    setLoading(false);
+  }
+};
 
     // ── Start defending a battle ──────────────────────────────────────
     // THIS is the fix for "Defend Now button not working"
