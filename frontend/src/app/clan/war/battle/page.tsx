@@ -1,673 +1,1308 @@
-
 "use client";
-
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import axios from "axios";
-import {
-  useMultiplayerTimer,
-  QuestionTimerBar,
-  BattleClock,
-  TimeoutOverlay,
-} from "@/components/battle/MultiplayerTimer";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-// ── Inline mini characters (same as inbox) ────────────────────────────
-function MiniWarrior({ color = "#60a5fa", flip = false }: { color?: string; flip?: boolean }) {
-  return (
-    <svg width="68" height="96" viewBox="0 0 80 112" fill="none"
-      style={{ transform: flip ? "scaleX(-1)" : "none" }}>
-      <path d="M28 14 Q28 6 40 6 Q52 6 52 14 L52 22 Q52 28 40 28 Q28 28 28 22Z" fill={color} opacity="0.9"/>
-      <ellipse cx="36" cy="18" rx="3" ry="2.5" fill="#fff"/>
-      <ellipse cx="44" cy="18" rx="3" ry="2.5" fill="#fff"/>
-      <ellipse cx="37" cy="18" rx="1.8" ry="1.8" fill="#0f172a"/>
-      <ellipse cx="45" cy="18" rx="1.8" ry="1.8" fill="#0f172a"/>
-      <rect x="37" y="27" width="6" height="5" fill={color} opacity="0.7"/>
-      <path d="M26 32 L32 30 L40 31 L48 30 L54 32 L54 60 L26 60Z" fill={color} opacity="0.85"/>
-      <rect x="14" y="33" width="12" height="22" rx="5" fill={color} opacity="0.8"/>
-      <rect x="54" y="33" width="12" height="22" rx="5" fill={color} opacity="0.8"/>
-      <rect x="63" y="15" width="4" height="50" rx="1.5" fill="#94a3b8"/>
-      <rect x="60" y="32" width="10" height="3" rx="1" fill="#fbbf24"/>
-      <rect x="28" y="59" width="11" height="28" rx="5" fill={color} opacity="0.85"/>
-      <rect x="41" y="59" width="11" height="28" rx="5" fill={color} opacity="0.85"/>
-      <rect x="26" y="83" width="15" height="8" rx="4" fill={color} opacity="0.65"/>
-      <rect x="39" y="83" width="15" height="8" rx="4" fill={color} opacity="0.65"/>
-    </svg>
-  );
-}
+const BADGE_EMOJIS = ["🔥", "⚡", "🌟", "💎", "🏆", "🛡️", "⚔️", "🧠", "🚀", "🎯",
+    "🌊", "🌙", "☀️", "🦁", "🐉", "🦅", "🌸", "❄️", "💜", "🔮"];
+const BADGE_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4",
+    "#6366f1", "#a855f7", "#ec4899", "#14b8a6", "#f59e0b"];
 
-// ── War PvP Arena ─────────────────────────────────────────────────────
-function WarArena({
-  attackerName, defenderName,
-  attackerHP, defenderHP,
-  maxHP,
-  attackerAnim, defenderAnim,
-  dmgFloat, showCrit, logMsg, lastResult,
-  clanAColor, clanBColor,
-}: any) {
+const MSG_TYPE_COLORS: Record<string, string> = {
+    text: "#9ca3af", question: "#60a5fa", resource: "#34d399", announcement: "#fbbf24"
+};
+const MSG_TYPE_ICONS: Record<string, string> = {
+    text: "💬", question: "❓", resource: "📎", announcement: "📣"
+};
+const ROLE_COLORS: Record<string, string> = {
+    leader: "#fbbf24", co_leader: "#c084fc", member: "#6b7280"
+};
+const ROLE_LABELS: Record<string, string> = {
+    leader: "👑 Leader", co_leader: "⭐ Co-Leader", member: "🗡️ Member"
+};
 
-  const hpPct   = (hp: number) => Math.max(0, Math.min(100, (hp / maxHP) * 100));
-  const hpColor = (pct: number) => pct > 60 ? "#22c55e" : pct > 30 ? "#f59e0b" : "#ef4444";
-  const aP = hpPct(attackerHP);
-  const dP = hpPct(defenderHP);
 
-  const aStyle = () => {
-    if (attackerAnim === "attack") return { animation: "warAttack .7s ease-in-out" };
-    if (attackerAnim === "hit")    return { animation: "warHit .5s ease-in-out" };
-    return { animation: "warIdle 3s ease-in-out infinite" };
-  };
-  const dStyle = () => {
-    if (defenderAnim === "attack") return { animation: "warAttackFlip .7s ease-in-out", transform: "scaleX(-1)" };
-    if (defenderAnim === "hit")    return { animation: "warHitFlip .5s ease-in-out" };
-    if (defenderAnim === "death")  return { animation: "warDeath 1.5s ease-out forwards", transform: "scaleX(-1)" };
-    return { animation: "warIdleFlip 3.5s ease-in-out infinite", transform: "scaleX(-1)" };
-  };
 
-  return (
-    <div style={{
-      position:        "relative",
-      backgroundImage: "linear-gradient(180deg,#0a0005 0%,#150010 35%,#0a0010 70%,#050010 100%)",
-      border:          "1px solid rgba(239,68,68,.25)",
-      borderRadius:    "clamp(14px,3vw,20px)",
-      overflow:        "hidden", marginBottom: 16,
-      boxShadow:       "0 0 60px rgba(0,0,0,.9), inset 0 0 60px rgba(185,28,28,.03)",
-    }}>
-      {/* War scanlines */}
-      <div style={{ position:"absolute", inset:0, pointerEvents:"none", zIndex:1,
-        backgroundImage:"repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.02) 2px,rgba(0,0,0,.02) 4px)" }}/>
+const STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box}body{background:#030712;color:#fff;font-family:'Rajdhani',sans-serif;margin:0}
+  button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  input,textarea{font-size:16px!important}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+  @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  @keyframes borderPulse{0%,100%{border-color:rgba(239,68,68,.2)}50%{border-color:rgba(239,68,68,.7);box-shadow:0 0 20px rgba(239,68,68,.3)}}
+  @keyframes gradShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+  @keyframes bounceIn{0%{transform:scale(.3);opacity:0}50%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+  .tabs{display:flex;gap:4px;background:rgba(0,0,0,.4);border-radius:13px;padding:4px;border:1px solid rgba(255,255,255,.05);overflow-x:auto}
+  .tab{flex:1;min-width:fit-content;padding:clamp(9px,2.5vw,11px) clamp(10px,3vw,16px);border:none;border-radius:10px;font-family:Cinzel,serif;font-size:clamp(10px,2.5vw,12px);font-weight:700;cursor:pointer;transition:all .25s;white-space:nowrap;letter-spacing:.06em}
+  .members-grid{display:grid;grid-template-columns:1fr;gap:8px}
+  @media(min-width:640px){.members-grid{grid-template-columns:1fr 1fr}}
+  @media(min-width:1024px){.members-grid{grid-template-columns:1fr 1fr 1fr}}
+  .war-matchups{display:flex;flex-direction:column;gap:10px}
+`;
 
-      {/* Header */}
-      <div style={{ background:"rgba(0,0,0,.6)", borderBottom:"1px solid rgba(239,68,68,.12)",
-        padding:"8px 20px", display:"flex", justifyContent:"space-between",
-        alignItems:"center", position:"relative", zIndex:2 }}>
-        <span style={{ fontSize:10, color:"#ef4444", fontFamily:"Cinzel",
-          letterSpacing:".22em", fontWeight:700 }}>⚔ CLAN WAR BATTLE</span>
-        <span style={{ fontSize:10, color:"#f97316", fontWeight:700,
-          animation:"warGlowPulse 1.5s infinite" }}>🔥 WAR</span>
-      </div>
+export default function ClanPage() {
+    const router = useRouter();
+    const [tab, setTab] = useState<"home" | "room" | "war" | "search" | "create">("home");
+    const [clanData, setClanData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [messages, setMessages] = useState<any[]>([]);
+    const [msgInput, setMsgInput] = useState("");
+    const [msgType, setMsgType] = useState("text");
+    const [searchQ, setSearchQ] = useState("");
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [warData, setWarData] = useState<any>(null);
+    const [createForm, setCreateForm] = useState({
+        name: "", description: "", badge_emoji: "🔥", badge_color: "#ef4444", is_open: true
+    });
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
+    const chatRef = useRef<HTMLDivElement>(null);
+    const pollRef = useRef<NodeJS.Timeout | null>(null);
 
-      <div style={{ padding:"20px clamp(14px,4vw,32px) 28px", position:"relative", zIndex:2 }}>
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+    const user = typeof window !== "undefined"
+        ? JSON.parse(localStorage.getItem("user") || "null") : null;
+    const headers = { Authorization: `Bearer ${token}` };
 
-        {/* CRIT */}
-        {showCrit && (
-          <div style={{
-            position:"absolute", top:"8%", left:"50%", transform:"translateX(-50%)",
-            fontFamily:"Cinzel", fontSize:"clamp(18px,4vw,30px)", fontWeight:900,
-            color:"#fbbf24", textShadow:"0 0 24px #fbbf24,0 0 48px #fbbf24",
-            animation:"warCritFlash 1.2s ease-out forwards",
-            zIndex:20, whiteSpace:"nowrap", pointerEvents:"none",
-          }}>⚡ CRIT!</div>
-        )}
+    useEffect(() => {
+        if (!token) { router.push("/"); return; }
+        loadAll();
+        // Poll messages every 10 seconds when on room tab
+        pollRef.current = setInterval(() => {
+            if (tab === "room") loadMessages();
+        }, 10000);
+        return () => clearInterval(pollRef.current);
+    }, []);
 
-        <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", gap:6 }}>
+    useEffect(() => {
+        if (tab === "room") loadMessages();
+        if (tab === "war") loadWar();
+        if (tab === "search") handleSearch();
+    }, [tab]);
 
-          {/* Attacker */}
-          <div style={{ width:"40%", textAlign:"center" }}>
+    useEffect(() => {
+        // Auto-scroll chat to bottom
+        if (chatRef.current) {
+            chatRef.current.scrollTop = chatRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    const loadAll = async () => {
+        setLoading(true);
+        try {
+            const r = await axios.get(`${API}/clan/mine`, { headers });
+            setClanData(r.data);
+        } catch { }
+        finally { setLoading(false); }
+    };
+
+    const loadMessages = async () => {
+        try {
+            const r = await axios.get(`${API}/clan/room/messages`, { headers });
+            setMessages(r.data.messages || []);
+        } catch { }
+    };
+
+    const loadWar = async () => {
+        try {
+            const r = await axios.get(`${API}/clan/war/active/mine`, { headers });
+            setWarData(r.data);
+        } catch { }
+    };
+
+    const handleSearch = async () => {
+        try {
+            const r = await axios.get(`${API}/clan/search?q=${searchQ}`);
+            setSearchResults(r.data);
+        } catch { }
+    };
+
+    const handleJoin = async (clan_id: string) => {
+        try {
+            await axios.post(`${API}/clan/join/${clan_id}`, {}, { headers });
+            setSuccess("Joined clan! Welcome!");
+            loadAll();
+            setTab("home");
+        } catch (e: any) {
+            setError(e.response?.data?.detail || "Could not join");
+        }
+    };
+
+    const handleCreate = async () => {
+        setError("");
+        try {
+            await axios.post(`${API}/clan/create`, createForm, { headers });
+            setSuccess("Clan created! You are the leader!");
+            loadAll();
+            setTab("home");
+        } catch (e: any) {
+            setError(e.response?.data?.detail || "Could not create clan");
+        }
+    };
+
+    const handleSendMessage = async () => {
+        if (!msgInput.trim()) return;
+        try {
+            const r = await axios.post(`${API}/clan/room/post`,
+                { body: msgInput.trim(), msg_type: msgType }, { headers });
+            setMessages(prev => [...prev, r.data]);
+            setMsgInput("");
+        } catch (e: any) {
+            setError(e.response?.data?.detail || "Could not send");
+        }
+    };
+
+    const inClan = clanData?.in_clan;
+    const clan = clanData?.clan;
+    const members = clanData?.members || [];
+    const myRole = clan?.my_role || "member";
+    const isLeader = myRole === "leader" || myRole === "co_leader";
+
+    if (loading) return (
+        <div style={{
+            minHeight: "100vh", background: "#030712",
+            display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+            <style>{STYLES}</style>
+            <div style={{ textAlign: "center" }}>
+                <div style={{
+                    fontSize: 64, animation: "spin 1.5s linear infinite",
+                    display: "inline-block", filter: "drop-shadow(0 0 24px rgba(168,85,247,.9))"
+                }}>🛡️</div>
+                <div style={{
+                    fontFamily: "Cinzel", fontSize: 18, color: "#a855f7",
+                    marginTop: 16, letterSpacing: ".2em"
+                }}>LOADING CLAN...</div>
+            </div>
+        </div>
+    );
+
+    return (
+        <div style={{
+            minHeight: "100vh", background: "#030712",
+            color: "#fff", fontFamily: "Rajdhani"
+        }}>
+            <style>{STYLES}</style>
+
+            {/* War Disclaimer Banner */}
             <div style={{
-              backgroundImage:`linear-gradient(90deg,transparent,${clanAColor}22,transparent)`,
-              border:`1px solid ${clanAColor}30`, borderRadius:9,
-              padding:"4px 6px", marginBottom:12,
-              fontSize:"clamp(9px,2.5vw,11px)", fontFamily:"Cinzel",
-              fontWeight:700, color:clanAColor, whiteSpace:"nowrap",
-              overflow:"hidden", textOverflow:"ellipsis",
+                background: "linear-gradient(135deg,rgba(30,58,138,.6),rgba(88,28,135,.6))",
+                borderBottom: "1px solid rgba(99,102,241,.3)",
+                padding: "clamp(8px,2vw,10px) clamp(14px,3vw,24px)",
+                textAlign: "center", fontSize: "clamp(10px,2.5vw,12px)",
+                color: "#a5b4fc", fontWeight: 600
             }}>
-              ⚔️ {attackerName}
+                ☮️ <strong style={{ color: "#6366f1" }}>EduRPG Stands Against War</strong> —
+                Clan Wars are friendly academic competitions only. We promote learning,
+                collaboration and peaceful rivalry. Study together, grow together.
             </div>
-            <div style={{ position:"relative", display:"inline-block" }}>
-              <div style={{ position:"absolute", bottom:-8, left:"50%", transform:"translateX(-50%)",
-                width:"clamp(44px,10vw,62px)", height:12, borderRadius:"50%",
-                backgroundImage:`radial-gradient(ellipse,${clanAColor}55,transparent 70%)`,
-                filter:"blur(4px)" }}/>
-              {dmgFloat && !dmgFloat.isAttacker && (
-                <div style={{ position:"absolute", top:-16, left:"50%", transform:"translateX(-50%)",
-                  fontSize:"clamp(14px,4vw,20px)", fontWeight:900, fontFamily:"Cinzel",
-                  color:"#f87171", textShadow:"0 0 10px #ef4444",
-                  animation:"warFloatUp 1s ease-out forwards",
-                  zIndex:10, whiteSpace:"nowrap", pointerEvents:"none" }}>
-                  💔-{dmgFloat.val}
-                </div>
-              )}
-              <div style={{ display:"inline-block",
-                filter:`drop-shadow(0 0 14px ${clanAColor}) drop-shadow(0 4px 8px rgba(0,0,0,.9))`,
-                ...aStyle() }}>
-                <MiniWarrior color={clanAColor} />
-              </div>
-            </div>
-            <div style={{ marginTop:12 }}>
-              <div style={{ display:"flex", justifyContent:"space-between",
-                fontSize:9, color:"#9ca3af", marginBottom:3, fontWeight:700 }}>
-                <span>HP</span>
-                <span style={{ color:hpColor(aP), fontFamily:"Cinzel" }}>
-                  {attackerHP}/{maxHP}
-                </span>
-              </div>
-              <div style={{ height:8, background:"rgba(0,0,0,.6)", borderRadius:4,
-                overflow:"hidden", border:"1px solid rgba(255,255,255,.07)" }}>
-                <div style={{ height:"100%", width:`${aP}%`,
-                  backgroundImage:`linear-gradient(90deg,${hpColor(aP)}55,${hpColor(aP)})`,
-                  borderRadius:4, boxShadow:`0 0 6px ${hpColor(aP)}`,
-                  transition:"width .6s ease" }}/>
-              </div>
-            </div>
-          </div>
 
-          {/* Center */}
-          <div style={{ textAlign:"center", flex:1, display:"flex",
-            flexDirection:"column", alignItems:"center", gap:6 }}>
-            <div style={{ fontFamily:"Cinzel", fontSize:"clamp(22px,5vw,36px)",
-              fontWeight:900, lineHeight:1,
-              color:"#ef4444", textShadow:"0 0 12px #ef4444,0 0 24px #ef4444",
-              animation:"warVsFlash 2s ease infinite" }}>VS</div>
-            <div style={{ background:"rgba(0,0,0,.55)",
-              border:"1px solid rgba(255,255,255,.06)", borderRadius:9,
-              padding:"6px 8px", fontSize:"clamp(9px,2.5vw,11px)",
-              color:"#9ca3af", lineHeight:1.5,
-              maxWidth:110, textAlign:"center", minHeight:32 }}>
-              {logMsg}
-            </div>
-            {lastResult && (
-              <div style={{
-                fontSize:"clamp(9px,2.5vw,11px)", fontWeight:700, fontFamily:"Cinzel",
-                padding:"3px 10px", borderRadius:20, animation:"warBounceIn .4s ease-out",
-                backgroundImage:lastResult.is_correct
-                  ?"linear-gradient(135deg,rgba(34,197,94,.28),rgba(21,128,61,.22))"
-                  :"linear-gradient(135deg,rgba(239,68,68,.28),rgba(185,28,28,.22))",
-                border:`1px solid ${lastResult.is_correct?"rgba(74,222,128,.5)":"rgba(248,113,113,.5)"}`,
-                color:lastResult.is_correct?"#4ade80":"#f87171",
-              }}>
-                {lastResult.is_correct?"✓ HIT!":"✗ MISS!"}
-              </div>
-            )}
-          </div>
-
-          {/* Defender */}
-          <div style={{ width:"40%", textAlign:"center" }}>
-            <div style={{
-              backgroundImage:`linear-gradient(90deg,transparent,${clanBColor}22,transparent)`,
-              border:`1px solid ${clanBColor}30`, borderRadius:9,
-              padding:"4px 6px", marginBottom:12,
-              fontSize:"clamp(9px,2.5vw,11px)", fontFamily:"Cinzel",
-              fontWeight:700, color:clanBColor, whiteSpace:"nowrap",
-              overflow:"hidden", textOverflow:"ellipsis",
+            {/* Nav */}
+            <nav style={{
+                background: "rgba(0,0,0,.78)",
+                borderBottom: "1px solid rgba(168,85,247,.18)",
+                padding: "0 clamp(14px,3vw,24px)", height: 56,
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                position: "sticky", top: 0, zIndex: 50, backdropFilter: "blur(16px)"
             }}>
-              🛡️ {defenderName}
-            </div>
-            <div style={{ position:"relative", display:"inline-block" }}>
-              <div style={{ position:"absolute", bottom:-8, left:"50%", transform:"translateX(-50%)",
-                width:"clamp(44px,10vw,62px)", height:12, borderRadius:"50%",
-                backgroundImage:`radial-gradient(ellipse,${clanBColor}55,transparent 70%)`,
-                filter:"blur(4px)" }}/>
-              {dmgFloat && dmgFloat.isAttacker && (
-                <div style={{ position:"absolute", top:-16, left:"50%", transform:"translateX(-50%)",
-                  fontSize:"clamp(14px,4vw,20px)", fontWeight:900, fontFamily:"Cinzel",
-                  color:"#fbbf24", textShadow:"0 0 10px #f59e0b",
-                  animation:"warFloatUp 1s ease-out forwards",
-                  zIndex:10, whiteSpace:"nowrap", pointerEvents:"none" }}>
-                  ⚔️-{dmgFloat.val}
-                </div>
-              )}
-              <div style={{ display:"inline-block",
-                filter:`drop-shadow(0 0 14px ${clanBColor}) drop-shadow(0 4px 8px rgba(0,0,0,.9))`,
-                ...dStyle() }}>
-                <MiniWarrior color={clanBColor} flip />
-              </div>
-            </div>
-            <div style={{ marginTop:12 }}>
-              <div style={{ display:"flex", justifyContent:"space-between",
-                fontSize:9, color:"#9ca3af", marginBottom:3, fontWeight:700 }}>
-                <span>HP</span>
-                <span style={{ color:hpColor(dP), fontFamily:"Cinzel" }}>
-                  {defenderHP}/{maxHP}
-                </span>
-              </div>
-              <div style={{ height:8, background:"rgba(0,0,0,.6)", borderRadius:4,
-                overflow:"hidden", border:"1px solid rgba(255,255,255,.07)" }}>
-                <div style={{ height:"100%", width:`${dP}%`,
-                  backgroundImage:`linear-gradient(90deg,${hpColor(dP)}55,${hpColor(dP)})`,
-                  borderRadius:4, boxShadow:`0 0 6px ${hpColor(dP)}`,
-                  transition:"width .6s ease" }}/>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Ground line */}
-        <div style={{ height:2, marginTop:18,
-          backgroundImage:`linear-gradient(90deg,transparent,${clanAColor}55,rgba(239,68,68,.6),${clanBColor}55,transparent)`,
-          borderRadius:1 }}/>
-      </div>
-
-      <style>{`
-        @keyframes warIdle      { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-        @keyframes warIdleFlip  { 0%,100%{transform:translateY(0) scaleX(-1)} 50%{transform:translateY(-7px) scaleX(-1)} }
-        @keyframes warAttack    { 0%{transform:translateX(0) scaleX(1)} 20%{transform:translateX(-8px) scaleX(.92)} 50%{transform:translateX(48px) scaleX(1.2)} 70%{transform:translateX(42px)} 100%{transform:translateX(0) scaleX(1)} }
-        @keyframes warAttackFlip{ 0%{transform:translateX(0) scaleX(-1)} 20%{transform:translateX(8px) scaleX(-.92)} 50%{transform:translateX(-48px) scaleX(-1.2)} 70%{transform:translateX(-42px) scaleX(-1.1)} 100%{transform:translateX(0) scaleX(-1)} }
-        @keyframes warHit       { 0%,100%{transform:translateX(0)} 20%{transform:translateX(12px);filter:brightness(3) saturate(0)} 40%{transform:translateX(-8px)} 60%{transform:translateX(5px)} 80%{transform:translateX(-3px)} }
-        @keyframes warHitFlip   { 0%,100%{transform:scaleX(-1) translateX(0)} 20%{transform:scaleX(-1) translateX(-12px);filter:brightness(3) saturate(0)} 40%{transform:scaleX(-1) translateX(8px)} 80%{transform:scaleX(-1) translateX(3px)} }
-        @keyframes warDeath     { 0%{opacity:1;transform:scaleX(-1) scale(1) rotate(0)} 50%{opacity:.5;transform:scaleX(-1) scale(.8) rotate(-30deg)} 100%{opacity:0;transform:scaleX(-1) scale(.3) rotate(-90deg) translateY(36px)} }
-        @keyframes warCritFlash { 0%{opacity:0;transform:scale(.2) rotate(-18deg)} 30%{opacity:1;transform:scale(1.3) rotate(8deg)} 60%{opacity:1} 100%{opacity:0;transform:scale(.8) translateY(-44px)} }
-        @keyframes warFloatUp   { 0%{opacity:1;transform:translateY(0) translateX(-50%) scale(1)} 100%{opacity:0;transform:translateY(-60px) translateX(-50%) scale(1.4)} }
-        @keyframes warVsFlash   { 0%,100%{color:#ef4444;text-shadow:0 0 10px #ef4444} 50%{color:#f97316;text-shadow:0 0 20px #f97316} }
-        @keyframes warBounceIn  { 0%{transform:scale(.3);opacity:0} 50%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
-        @keyframes warGlowPulse { 0%,100%{opacity:.4} 50%{opacity:1} }
-      `}</style>
-    </div>
-  );
-}
-
-// ── Main War Battle Page ──────────────────────────────────────────────
-function WarBattlePageContent() {
-  const router       = useRouter();
-  const searchParams = useSearchParams();
-  const matchupId    = searchParams.get("matchup") || "";
-  const warId        = searchParams.get("war")     || "";
-
-  const [matchup,      setMatchup]      = useState<any>(null);
-  const [questions,    setQuestions]    = useState<any[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [answers,      setAnswers]      = useState<Record<string,number>>({});
-  const [currentQIdx,  setCurrentQIdx]  = useState(0);
-  const [result,       setResult]       = useState<any>(null);
-  const [submitting,   setSubmitting]   = useState(false);
-  const [error,        setError]        = useState("");
-  const [showQExpired, setShowQExpired] = useState(false);
-  const [showBExpired, setShowBExpired] = useState(false);
-
-  // Animation state
-  const [attackerHP,   setAttackerHP]  = useState(100);
-  const [defenderHP,   setDefenderHP]  = useState(100);
-  const [attackerAnim, setAttackerAnim] = useState("idle");
-  const [defenderAnim, setDefenderAnim] = useState("idle");
-  const [showCrit,     setShowCrit]    = useState(false);
-  const [dmgFloat,     setDmgFloat]    = useState<any>(null);
-  const [logMsg,       setLogMsg]      = useState("⚔️ Clan War Battle!");
-  const [lastResult,   setLastResult]  = useState<any>(null);
-
-  const answeredRef    = useRef(false);
-  const currentQIdxRef = useRef(0);
-  const questionsRef   = useRef<any[]>([]);
-  const answersRef     = useRef<Record<string,number>>({});
-  const totalTimeRef   = useRef(0);
-
-  useEffect(() => { currentQIdxRef.current = currentQIdx; }, [currentQIdx]);
-  useEffect(() => { answersRef.current     = answers;      }, [answers]);
-
-  const token   = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
-  const user    = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || "null") : null;
-  const headers = { Authorization: `Bearer ${token}` };
-
-  // ── Load matchup ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!matchupId || !warId) { router.push("/clan"); return; }
-    loadMatchup();
-  }, [matchupId]);
-
-  const loadMatchup = async () => {
-    try {
-      const r = await axios.get(`${API}/clan/war/${warId}`, { headers });
-      const m = r.data.matchups?.find((x: any) => x.id === matchupId);
-      if (!m) { setError("Matchup not found"); return; }
-      setMatchup(m);
-
-      // Load questions for this matchup's topic
-      const qr = await axios.get(
-        `${API}/battle/question?topic=${m.topic}&difficulty=2`,
-        { headers }
-      );
-      // Generate 5 questions
-      const qs: any[] = [];
-      for (let i = 0; i < 5; i++) {
-        const qres = await axios.get(
-          `${API}/battle/question?topic=${m.topic}&difficulty=${Math.min(3,i+1)}`,
-          { headers }
-        );
-        if (qres.data) qs.push(qres.data);
-      }
-      questionsRef.current = qs;
-      setQuestions(qs);
-      startTimers();
-    } catch (e: any) {
-      setError(e.response?.data?.detail || "Failed to load matchup");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Advance question ──────────────────────────────────────────────
-  const advanceQuestion = useCallback(() => {
-    const next = currentQIdxRef.current + 1;
-    if (next < questionsRef.current.length) {
-      answeredRef.current = false;
-      setCurrentQIdx(next);
-      setLastResult(null);
-      resetQuestionTimer();
-    }
-  }, []);
-
-  // ── Timer callbacks ───────────────────────────────────────────────
-  const handleQuestionExpire = useCallback(() => {
-    if (answeredRef.current) return;
-    const q = questionsRef.current[currentQIdxRef.current];
-    if (!q) return;
-
-    const newAns = { ...answersRef.current, [q.id]: -1 };
-    answersRef.current = newAns;
-    setAnswers(newAns);
-    totalTimeRef.current += 30;
-    answeredRef.current = true;
-
-    // Animate defender attack (they defended successfully by default)
-    setDefenderAnim("attack");
-    setTimeout(() => {
-      setAttackerAnim("hit");
-      const dmg = Math.floor(Math.random()*15)+8;
-      setDmgFloat({ val:dmg, isAttacker:false });
-      setAttackerHP(prev => Math.max(0, prev - dmg));
-      setTimeout(() => { setAttackerAnim("idle"); setDefenderAnim("idle"); setDmgFloat(null); }, 600);
-    }, 400);
-    setLogMsg("⏰ Time's up!");
-    setShowQExpired(true);
-    setTimeout(() => { setShowQExpired(false); advanceQuestion(); }, 2200);
-  }, [advanceQuestion]);
-
-  const handleBattleExpire = useCallback(() => {
-    stopTimers();
-    setShowBExpired(true);
-    setTimeout(() => autoSubmit(), 2500);
-  }, []);
-
-  const { questionTimeLeft, battleTimeLeft, isPaused, startTimers, stopTimers,
-    pauseTimer, resumeTimer, resetQuestionTimer } = useMultiplayerTimer({
-    questionSeconds:  30, battleMinutes: 3,
-    onQuestionExpire: handleQuestionExpire,
-    onBattleExpire:   handleBattleExpire,
-  });
-
-  // ── Handle answer ─────────────────────────────────────────────────
-  const handleAnswer = useCallback((qId: string, idx: number) => {
-    if (answeredRef.current) return;
-    const timeUsed = 30 - questionTimeLeft;
-    totalTimeRef.current += timeUsed;
-    answeredRef.current = true;
-    pauseTimer();
-
-    const newAns = { ...answersRef.current, [qId]: idx };
-    answersRef.current = newAns;
-    setAnswers(newAns);
-
-    // Animate attacker striking
-    setAttackerAnim("attack");
-    setTimeout(() => {
-      setDefenderAnim("hit");
-      const dmg = Math.floor(Math.random()*22)+12;
-      setDmgFloat({ val:dmg, isAttacker:true });
-      setDefenderHP(prev => Math.max(0, prev - dmg));
-      setTimeout(() => { setDefenderAnim("idle"); setAttackerAnim("idle"); setDmgFloat(null); }, 600);
-    }, 400);
-    setLogMsg("⚔️ Answer submitted!");
-    setLastResult({ is_correct: true, selected_index: idx });
-
-    setTimeout(() => {
-      setLastResult(null);
-      answeredRef.current = false;
-      resumeTimer();
-      advanceQuestion();
-    }, 700);
-  }, [questionTimeLeft, pauseTimer, resumeTimer, advanceQuestion]);
-
-  const autoSubmit = useCallback(() => {
-    const finalAns: Record<string,number> = { ...answersRef.current };
-    questionsRef.current.forEach(q => { if (!(q.id in finalAns)) finalAns[q.id] = -1; });
-    setAnswers(finalAns);
-    doSubmit(finalAns);
-  }, []);
-
-  const doSubmit = async (finalAnswers?: Record<string,number>) => {
-    const ans = finalAnswers || answers;
-    setSubmitting(true); stopTimers();
-
-    // Count correct answers (we don't know without backend)
-    const score = Object.values(ans).filter(v => v !== -1).length;
-
-    try {
-      const res = await axios.post(`${API}/clan/war/battle`, {
-        matchup_id: matchupId,
-        score,
-      }, { headers });
-      setResult(res.data);
-    } catch (e: any) {
-      setError(e.response?.data?.detail || "Submission failed");
-    } finally { setSubmitting(false); }
-  };
-
-  const allAnswered = questions.length > 0 && questions.every(q => q.id in answers);
-  const currentQ   = questions[currentQIdx];
-
-  const STYLES = `
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
-    *{box-sizing:border-box} body{background:#030712;color:#fff;font-family:'Rajdhani',sans-serif;margin:0}
-    button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-    @keyframes wFadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes wSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-    @keyframes wBounceIn{0%{transform:scale(.3);opacity:0}50%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
-    @keyframes wPulse{0%,100%{opacity:.5}50%{opacity:1}}
-    @keyframes wVictoryPulse{0%,100%{box-shadow:0 0 20px rgba(251,191,36,.3)}50%{box-shadow:0 0 60px rgba(251,191,36,.8)}}
-    @keyframes wDefeatPulse{0%,100%{box-shadow:0 0 20px rgba(239,68,68,.3)}50%{box-shadow:0 0 60px rgba(239,68,68,.8)}}
-    .war-answer-grid{display:grid;grid-template-columns:1fr;gap:9px}
-    @media(min-width:480px){.war-answer-grid{grid-template-columns:1fr 1fr}}
-  `;
-
-  if (loading) return (
-    <div style={{ minHeight:"100vh", background:"#030712", display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <style>{STYLES}</style>
-      <div style={{ textAlign:"center" }}>
-        <div style={{ fontSize:64, animation:"wSpin 1s linear infinite", display:"inline-block", filter:"drop-shadow(0 0 20px rgba(239,68,68,.9))" }}>⚔️</div>
-        <div style={{ fontFamily:"Cinzel", fontSize:16, color:"#ef4444", marginTop:16, letterSpacing:".2em" }}>ENTERING WAR BATTLE...</div>
-      </div>
-    </div>
-  );
-
-  if (result) return (
-    <div style={{ minHeight:"100vh", background:"#030712", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"Rajdhani", padding:16 }}>
-      <style>{STYLES}</style>
-      <div style={{
-        backgroundImage:"linear-gradient(135deg,#0a0518,#150a28,#0a0518)",
-        border:`3px solid ${result.result==="attacker_won"?"#fbbf24":result.result==="draw"?"#9ca3af":"#ef4444"}`,
-        borderRadius:24, padding:"clamp(28px,6vw,48px)", textAlign:"center", maxWidth:420, width:"100%",
-        animation:result.result==="attacker_won"?"wVictoryPulse 2s infinite":"wDefeatPulse 2s infinite",
-      }}>
-        <div style={{ fontSize:"clamp(56px,14vw,84px)", marginBottom:12, animation:"wBounceIn .6s ease-out" }}>
-          {result.result==="attacker_won"?"🏆":result.result==="draw"?"🤝":"🛡️"}
-        </div>
-        <div style={{ fontFamily:"Cinzel", fontSize:"clamp(22px,6vw,36px)", fontWeight:900,
-          color:result.result==="attacker_won"?"#fbbf24":result.result==="draw"?"#9ca3af":"#60a5fa",
-          marginBottom:8 }}>
-          {result.result==="attacker_won"?"VICTORY!":result.result==="draw"?"DRAW":"DEFENDER WINS"}
-        </div>
-        <div style={{ background:"rgba(0,0,0,.4)", border:"1px solid rgba(255,255,255,.06)", borderRadius:14, padding:16, margin:"14px 0" }}>
-          <div style={{ display:"flex", justifyContent:"space-around", padding:"8px 0" }}>
-            <div style={{ textAlign:"center" }}>
-              <div style={{ fontFamily:"Cinzel", fontSize:24, fontWeight:700, color:"#60a5fa" }}>{result.attacker_score}</div>
-              <div style={{ fontSize:10, color:"#6b7280", fontWeight:700 }}>ATTACKER</div>
-            </div>
-            <div style={{ fontSize:18, alignSelf:"center", color:"#6b7280" }}>vs</div>
-            <div style={{ textAlign:"center" }}>
-              <div style={{ fontFamily:"Cinzel", fontSize:24, fontWeight:700, color:"#f87171" }}>{result.defender_score}</div>
-              <div style={{ fontSize:10, color:"#6b7280", fontWeight:700 }}>DEFENDER</div>
-            </div>
-          </div>
-        </div>
-        <button onClick={() => router.push("/clan")} style={{
-          backgroundImage:"linear-gradient(135deg,#7c3aed,#be185d)",
-          border:"none", borderRadius:12, padding:"12px 36px",
-          color:"#fff", fontFamily:"Cinzel", fontSize:13,
-          fontWeight:700, cursor:"pointer", letterSpacing:".1em" }}>
-          🛡️ BACK TO CLAN
-        </button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{ minHeight:"100vh", background:"#030712", color:"#fff", fontFamily:"Rajdhani" }}>
-      <style>{STYLES}</style>
-
-      {showQExpired && <TimeoutOverlay type="question" onClose={() => setShowQExpired(false)} />}
-      {showBExpired && <TimeoutOverlay type="battle"   onClose={() => setShowBExpired(false)} />}
-
-      {/* Nav */}
-      <nav style={{ background:"rgba(0,0,0,.78)", borderBottom:"1px solid rgba(239,68,68,.18)",
-        padding:"0 clamp(14px,3vw,24px)", height:52,
-        display:"flex", justifyContent:"space-between", alignItems:"center",
-        position:"sticky", top:0, zIndex:50, backdropFilter:"blur(16px)" }}>
-        <button onClick={() => { stopTimers(); router.push("/clan"); }}
-          style={{ background:"none", border:"1px solid rgba(255,255,255,.08)", borderRadius:8,
-            padding:"6px 12px", cursor:"pointer", color:"#9ca3af", fontSize:13,
-            fontFamily:"Rajdhani", fontWeight:600 }}>← CLAN</button>
-        <div style={{ fontFamily:"Cinzel", fontSize:"clamp(11px,3vw,14px)", fontWeight:700,
-          background:"linear-gradient(135deg,#ef4444,#f97316)",
-          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-          🔥 CLAN WAR BATTLE
-        </div>
-        <BattleClock timeLeft={battleTimeLeft} isPaused={isPaused} />
-      </nav>
-
-      <div style={{ maxWidth:720, margin:"0 auto", padding:"clamp(14px,3vw,20px) clamp(12px,3vw,16px)" }}>
-
-        {/* War disclaimer */}
-        <div style={{ background:"rgba(30,58,138,.2)", border:"1px solid rgba(99,102,241,.25)",
-          borderRadius:10, padding:"8px 14px", marginBottom:14,
-          fontSize:10, color:"#a5b4fc", textAlign:"center", lineHeight:1.5 }}>
-          ☮️ This is a <strong>friendly academic competition</strong>. EduRPG stands against real-world conflict.
-        </div>
-
-        {matchup && (
-          <div style={{ background:"rgba(239,68,68,.08)", border:"1px solid rgba(239,68,68,.2)",
-            borderRadius:12, padding:"10px 16px", marginBottom:14,
-            display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
-            <div>
-              <div style={{ fontSize:12, color:"#f87171", fontWeight:700 }}>
-                {matchup.attacker_name} vs {matchup.defender_name}
-              </div>
-              <div style={{ fontSize:10, color:"#6b7280", marginTop:2 }}>
-                Topic: <span style={{ color:"#c084fc", fontWeight:700 }}>
-                  {matchup.topic?.replace(/-/g," ").replace(/\b\w/g, (l:string) => l.toUpperCase())}
-                </span>
-              </div>
-            </div>
-            <div style={{ fontSize:10, color:"#f97316", fontWeight:700, fontFamily:"Cinzel" }}>
-              Q{currentQIdx+1}/{questions.length}
-            </div>
-          </div>
-        )}
-
-        {/* ✅ War battle animation */}
-        <WarArena
-          attackerName={matchup?.attacker_name || "Attacker"}
-          defenderName={matchup?.defender_name || "Defender"}
-          attackerHP={attackerHP}
-          defenderHP={defenderHP}
-          maxHP={100}
-          attackerAnim={attackerAnim}
-          defenderAnim={defenderAnim}
-          dmgFloat={dmgFloat}
-          showCrit={showCrit}
-          logMsg={logMsg}
-          lastResult={lastResult}
-          clanAColor="#60a5fa"
-          clanBColor="#f87171"
-        />
-
-        {/* Progress dots */}
-        <div style={{ display:"flex", gap:6, marginBottom:14, justifyContent:"center", flexWrap:"wrap" }}>
-          {questions.map((q, i) => (
-            <div key={q.id} style={{
-              width:i===currentQIdx?26:10, height:10, borderRadius:5,
-              background: q.id in answers
-                ? answers[q.id]===-1 ? "#ef4444" : "#22c55e"
-                : i===currentQIdx ? "#a855f7" : "rgba(255,255,255,.1)",
-              transition:"all .3s",
-            }}/>
-          ))}
-        </div>
-
-        {/* Question */}
-        {currentQ && !allAnswered && (
-          <div style={{ background:"rgba(0,0,0,.5)", border:"1px solid rgba(239,68,68,.2)",
-            borderRadius:16, padding:20, marginBottom:14, animation:"wFadeIn .3s ease-out" }}>
-            <QuestionTimerBar timeLeft={questionTimeLeft} maxTime={30} isPaused={isPaused} />
-            <div style={{ fontSize:10, color:"#ef4444", letterSpacing:".2em",
-              fontWeight:700, marginBottom:12, fontFamily:"Cinzel" }}>
-              ⚔️ WAR QUESTION {currentQIdx+1}
-            </div>
-            <p style={{ fontSize:"clamp(13px,3.5vw,15px)", lineHeight:1.65,
-              color:"#e2e8f0", marginBottom:16, fontWeight:500 }}>
-              {currentQ.body}
-            </p>
-            <div className="war-answer-grid">
-              {currentQ.options?.map((opt:string, i:number) => (
-                <button key={i}
-                  onClick={() => !answeredRef.current && handleAnswer(currentQ.id, i)}
-                  disabled={answeredRef.current}
-                  style={{
-                    background:   "rgba(239,68,68,.06)", border:"1px solid rgba(239,68,68,.18)",
-                    borderRadius: 12, padding:"clamp(11px,3vw,14px) 14px",
-                    color:        "#fecaca", cursor:answeredRef.current?"not-allowed":"pointer",
-                    textAlign:    "left", fontSize:"clamp(12px,3vw,14px)",
-                    fontFamily:   "Rajdhani", fontWeight:600, transition:"all .15s", minHeight:48,
-                  }}
-                  onMouseEnter={e=>{ if(!answeredRef.current){e.currentTarget.style.background="rgba(239,68,68,.14)"; e.currentTarget.style.transform="scale(1.02)";} }}
-                  onMouseLeave={e=>{ if(!answeredRef.current){e.currentTarget.style.background="rgba(239,68,68,.06)"; e.currentTarget.style.transform="scale(1)";} }}
-                >
-                  <span style={{ color:"#6b7280", fontWeight:800, marginRight:7,
-                    fontFamily:"Cinzel", fontSize:"clamp(10px,2.5vw,12px)" }}>
-                    {["A","B","C","D"][i]}
-                  </span>
-                  {opt}
+                <button onClick={() => router.push("/")}
+                    style={{
+                        background: "none", border: "1px solid rgba(255,255,255,.08)",
+                        borderRadius: 8, padding: "6px 12px", cursor: "pointer",
+                        color: "#9ca3af", fontSize: 13, fontFamily: "Rajdhani", fontWeight: 600
+                    }}>
+                    ← HOME
                 </button>
-              ))}
+                <div style={{
+                    fontFamily: "Cinzel", fontSize: "clamp(13px,3.5vw,18px)",
+                    fontWeight: 700, letterSpacing: ".1em",
+                    backgroundImage: "linear-gradient(135deg,#a855f7,#6366f1,#06b6d4)",
+                    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent"
+                }}>
+                    🛡️ CLAN HALL
+                </div>
+                {inClan && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 20 }}>{clan?.badge_emoji}</span>
+                        <span style={{
+                            fontSize: "clamp(10px,2.5vw,13px)", fontWeight: 700,
+                            color: clan.badge_color
+                        }}>{clan.name}</span>
+                    </div>
+                )}
+                {!inClan && <div style={{ width: 80 }} />}
+            </nav>
+
+            {/* Alert banners */}
+            {error && (
+                <div style={{
+                    background: "rgba(127,29,29,.4)", borderBottom: "1px solid rgba(239,68,68,.4)",
+                    padding: "10px 20px", textAlign: "center", fontSize: 13,
+                    color: "#fca5a5", cursor: "pointer"
+                }} onClick={() => setError("")}>
+                    ⚠️ {error} — tap to dismiss
+                </div>
+            )}
+            {success && (
+                <div style={{
+                    background: "rgba(21,128,61,.3)", borderBottom: "1px solid rgba(34,197,94,.4)",
+                    padding: "10px 20px", textAlign: "center", fontSize: 13,
+                    color: "#86efac", cursor: "pointer"
+                }} onClick={() => setSuccess("")}>
+                    ✅ {success}
+                </div>
+            )}
+
+            <div style={{
+                maxWidth: 900, margin: "0 auto",
+                padding: "clamp(16px,4vw,28px) clamp(14px,3vw,20px)"
+            }}>
+
+                {/* ── NOT IN CLAN — Show join/create ────────────────────────── */}
+                {!inClan && (
+                    <div style={{ animation: "fadeIn .5s ease-out" }}>
+                        <div style={{ textAlign: "center", marginBottom: 32 }}>
+                            <div style={{
+                                fontSize: "clamp(40px,12vw,72px)", marginBottom: 12,
+                                filter: "drop-shadow(0 0 20px rgba(168,85,247,.8))"
+                            }}>🛡️</div>
+                            <div style={{
+                                fontFamily: "Cinzel", fontSize: "clamp(18px,5vw,28px)",
+                                fontWeight: 700, color: "#e9d5ff", marginBottom: 8
+                            }}>
+                                Join a Clan
+                            </div>
+                            <p style={{ color: "#6b7280", fontSize: "clamp(12px,3vw,14px)" }}>
+                                Study with friends, compete in wars, climb the clan leaderboard
+                            </p>
+                        </div>
+
+                        <div className="tabs" style={{ marginBottom: 20 }}>
+                            {(["search", "create"] as const).map(t => (
+                                <button key={t} className="tab" onClick={() => setTab(t)} style={{
+                                    backgroundImage: tab === t
+                                        ? "linear-gradient(135deg,rgba(124,58,237,.5),rgba(190,24,93,.4))"
+                                        : "none",
+                                    background: tab === t ? undefined : "transparent",
+                                    color: tab === t ? "#e9d5ff" : "#6b7280",
+                                    boxShadow: tab === t ? "0 0 16px rgba(124,58,237,.3)" : "none",
+                                }}>
+                                    {t === "search" ? "🔍 Find Clan" : "➕ Create Clan"}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Search */}
+                        {tab === "search" && (
+                            <div style={{ animation: "fadeIn .3s ease-out" }}>
+                                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                                    <input value={searchQ}
+                                        onChange={e => setSearchQ(e.target.value)}
+                                        onKeyDown={e => e.key === "Enter" && handleSearch()}
+                                        placeholder="Search by name or #TAG..."
+                                        style={{
+                                            flex: 1, background: "rgba(0,0,0,.5)",
+                                            border: "1px solid rgba(255,255,255,.1)", borderRadius: 12,
+                                            padding: "12px 16px", color: "#e2e8f0", fontSize: 14,
+                                            fontFamily: "Rajdhani", fontWeight: 500, outline: "none"
+                                        }} />
+                                    <button onClick={handleSearch} style={{
+                                        backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d)",
+                                        border: "none", borderRadius: 12, padding: "12px 20px",
+                                        color: "#fff", fontFamily: "Cinzel", fontSize: 12,
+                                        fontWeight: 700, cursor: "pointer"
+                                    }}>
+                                        🔍
+                                    </button>
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                    {searchResults.map((c, i) => (
+                                        <ClanCard key={c.id} clan={c} i={i}
+                                            onJoin={() => handleJoin(c.id)} />
+                                    ))}
+                                    {searchResults.length === 0 && (
+                                        <div style={{
+                                            textAlign: "center", padding: 40,
+                                            color: "#374151", fontSize: 14
+                                        }}>
+                                            No clans found. Try a different search or create your own!
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Create */}
+                        {tab === "create" && (
+                            <div style={{
+                                background: "rgba(0,0,0,.4)",
+                                border: "1px solid rgba(168,85,247,.2)",
+                                borderRadius: 18, padding: "clamp(20px,5vw,32px)",
+                                animation: "fadeIn .3s ease-out"
+                            }}>
+                                <div style={{
+                                    fontFamily: "Cinzel", fontSize: 16, fontWeight: 700,
+                                    color: "#c084fc", marginBottom: 20, letterSpacing: ".1em"
+                                }}>
+                                    ➕ CREATE YOUR CLAN
+                                </div>
+
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                    <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>CLAN NAME *</label>
+                                    <input value={createForm.name}
+                                        onChange={e => setCreateForm({ ...createForm, name: e.target.value })}
+                                        placeholder="Enter clan name (3-30 chars)"
+                                        style={{
+                                            background: "rgba(0,0,0,.5)",
+                                            border: "1px solid rgba(255,255,255,.1)", borderRadius: 12,
+                                            padding: "13px 16px", color: "#e2e8f0", fontSize: 14,
+                                            fontFamily: "Rajdhani", fontWeight: 500, outline: "none"
+                                        }} />
+
+                                    <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>DESCRIPTION</label>
+                                    <textarea value={createForm.description}
+                                        onChange={e => setCreateForm({ ...createForm, description: e.target.value })}
+                                        placeholder="What does your clan study?"
+                                        rows={2}
+                                        style={{
+                                            background: "rgba(0,0,0,.5)",
+                                            border: "1px solid rgba(255,255,255,.1)", borderRadius: 12,
+                                            padding: "13px 16px", color: "#e2e8f0", fontSize: 14,
+                                            fontFamily: "Rajdhani", fontWeight: 500, outline: "none",
+                                            resize: "vertical"
+                                        }} />
+
+                                    <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>CLAN BADGE EMOJI</label>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                        {BADGE_EMOJIS.map(e => (
+                                            <button key={e} onClick={() => setCreateForm({ ...createForm, badge_emoji: e })}
+                                                style={{
+                                                    fontSize: 24, background: createForm.badge_emoji === e
+                                                        ? "rgba(168,85,247,.3)" : "rgba(255,255,255,.04)",
+                                                    border: `1px solid ${createForm.badge_emoji === e
+                                                        ? "rgba(168,85,247,.6)" : "rgba(255,255,255,.06)"}`,
+                                                    borderRadius: 10, padding: "6px 10px", cursor: "pointer",
+                                                    transition: "all .15s"
+                                                }}>
+                                                {e}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>CLAN COLOR</label>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                        {BADGE_COLORS.map(c => (
+                                            <button key={c} onClick={() => setCreateForm({ ...createForm, badge_color: c })}
+                                                style={{
+                                                    width: 32, height: 32, borderRadius: "50%",
+                                                    background: c, cursor: "pointer",
+                                                    border: `3px solid ${createForm.badge_color === c
+                                                        ? "#fff" : "transparent"}`,
+                                                    boxShadow: createForm.badge_color === c
+                                                        ? `0 0 10px ${c}` : "none",
+                                                    transition: "all .15s"
+                                                }} />
+                                        ))}
+                                    </div>
+
+                                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
+                                        <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>OPEN TO JOIN</label>
+                                        <button onClick={() => setCreateForm({ ...createForm, is_open: !createForm.is_open })}
+                                            style={{
+                                                background: createForm.is_open
+                                                    ? "rgba(34,197,94,.25)" : "rgba(239,68,68,.2)",
+                                                border: `1px solid ${createForm.is_open
+                                                    ? "rgba(34,197,94,.5)" : "rgba(239,68,68,.4)"}`,
+                                                borderRadius: 20, padding: "6px 16px", cursor: "pointer",
+                                                color: createForm.is_open ? "#4ade80" : "#f87171",
+                                                fontSize: 12, fontWeight: 700
+                                            }}>
+                                            {createForm.is_open ? "✅ Open" : "🔒 Invite Only"}
+                                        </button>
+                                    </div>
+
+                                    {/* Preview */}
+                                    <div style={{
+                                        background: `${createForm.badge_color}12`,
+                                        border: `1px solid ${createForm.badge_color}35`,
+                                        borderRadius: 12, padding: "12px 16px",
+                                        display: "flex", alignItems: "center", gap: 12
+                                    }}>
+                                        <span style={{
+                                            fontSize: 32,
+                                            filter: `drop-shadow(0 0 8px ${createForm.badge_color})`
+                                        }}>
+                                            {createForm.badge_emoji}
+                                        </span>
+                                        <div>
+                                            <div style={{
+                                                fontFamily: "Cinzel", fontWeight: 700,
+                                                color: createForm.badge_color, fontSize: 16
+                                            }}>
+                                                {createForm.name || "Clan Name"}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: "#6b7280" }}>
+                                                Preview
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={handleCreate}
+                                        disabled={createForm.name.length < 3}
+                                        style={{
+                                            backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d)",
+                                            border: "none", borderRadius: 12, padding: "14px",
+                                            color: "#fff", fontFamily: "Cinzel", fontSize: 14,
+                                            fontWeight: 700, cursor: "pointer", letterSpacing: ".1em",
+                                            opacity: createForm.name.length < 3 ? .5 : 1,
+                                            boxShadow: "0 0 20px rgba(124,58,237,.4)", marginTop: 4
+                                        }}>
+                                        🛡️ CREATE CLAN
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── IN CLAN ───────────────────────────────────────────────── */}
+                {inClan && (
+                    <div>
+                        {/* Clan header */}
+                        <div style={{
+                            backgroundImage: `linear-gradient(135deg,${clan.badge_color}14,rgba(0,0,0,.5))`,
+                            border: `2px solid ${clan.badge_color}35`,
+                            borderRadius: 18, padding: "clamp(16px,4vw,24px)",
+                            marginBottom: 20, display: "flex",
+                            justifyContent: "space-between", alignItems: "center", gap: 16,
+                            flexWrap: "wrap"
+                        }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                                <div style={{
+                                    fontSize: "clamp(40px,10vw,56px)",
+                                    filter: `drop-shadow(0 0 16px ${clan.badge_color})`
+                                }}>
+                                    {clan?.badge_emoji}
+                                </div>
+                                <div>
+                                    <div style={{
+                                        fontFamily: "Cinzel",
+                                        fontSize: "clamp(18px,5vw,26px)", fontWeight: 900,
+                                        color: clan.badge_color
+                                    }}>
+                                        {clan.name}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                                        {clan.tag} · Level {clan.level} ·{" "}
+                                        {clan.member_count}/{clan.max_members} members
+                                    </div>
+                                    <div style={{
+                                        fontSize: 11, marginTop: 4,
+                                        color: ROLE_COLORS[myRole] || "#6b7280", fontWeight: 700
+                                    }}>
+                                        {ROLE_LABELS[myRole] || myRole}
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                                <div style={{
+                                    fontFamily: "Cinzel", fontSize: "clamp(20px,5vw,28px)",
+                                    fontWeight: 700, color: "#fbbf24"
+                                }}>
+                                    {(clan.total_xp || 0).toLocaleString()} XP
+                                </div>
+                                <div style={{
+                                    fontSize: 10, color: "#6b7280",
+                                    letterSpacing: ".12em", fontWeight: 700
+                                }}>
+                                    CLAN XP
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* War alert */}
+                        {clanData?.active_war && (
+                            <div style={{
+                                backgroundImage: "linear-gradient(135deg,rgba(220,38,38,.15),rgba(0,0,0,.4))",
+                                border: "1px solid rgba(239,68,68,.35)",
+                                borderRadius: 14, padding: "12px 18px", marginBottom: 18,
+                                display: "flex", justifyContent: "space-between",
+                                alignItems: "center", cursor: "pointer",
+                                animation: "borderPulse 2s ease infinite"
+                            }}
+                                onClick={() => setTab("war")}>
+                                <div>
+                                    <span style={{ fontSize: 16, marginRight: 8 }}>⚔️</span>
+                                    <strong style={{ color: "#fca5a5" }}>
+                                        WAR IN PROGRESS
+                                    </strong>
+                                    <span style={{ color: "#6b7280", fontSize: 12, marginLeft: 8 }}>
+                                        vs {clanData.active_war.clan_a_id === clan.id
+                                            ? clanData.active_war.clan_b_name
+                                            : clanData.active_war.clan_a_name}
+                                    </span>
+                                </div>
+                                <span style={{ color: "#ef4444", fontWeight: 700, fontSize: 13 }}>
+                                    VIEW WAR →
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Tabs */}
+                        <div className="tabs" style={{ marginBottom: 20 }}>
+                            {[
+                                ["home", "🏠 Clan"],
+                                ["room", "💬 Study Room"],
+                                ["war", "⚔️ War"],
+                                ...(isLeader ? [["search", "🔍 Recruit"]] as const : []),
+                            ].map(([t, l]) => (
+                                <button key={t} className="tab"
+                                    onClick={() => setTab(t as any)} style={{
+                                        backgroundImage: tab === t
+                                            ? "linear-gradient(135deg,rgba(124,58,237,.5),rgba(190,24,93,.4))"
+                                            : "none",
+                                        background: tab === t ? undefined : "transparent",
+                                        color: tab === t ? "#e9d5ff" : "#6b7280",
+                                        boxShadow: tab === t ? "0 0 16px rgba(124,58,237,.3)" : "none",
+                                    }}>
+                                    {l}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* ── HOME TAB ──────────────────────────────────────────── */}
+                        {tab === "home" && (
+                            <div style={{ animation: "fadeIn .3s ease-out" }}>
+                                {clan.description && (
+                                    <div style={{
+                                        background: "rgba(0,0,0,.35)",
+                                        border: "1px solid rgba(255,255,255,.07)",
+                                        borderRadius: 12, padding: "14px 18px", marginBottom: 18,
+                                        fontSize: 14, color: "#d1d5db", lineHeight: 1.6
+                                    }}>
+                                        📜 {clan.description}
+                                    </div>
+                                )}
+
+                                <div style={{
+                                    fontFamily: "Cinzel", fontSize: 13, fontWeight: 700,
+                                    color: "#9ca3af", letterSpacing: ".15em", marginBottom: 14
+                                }}>
+                                    MEMBERS ({members.length})
+                                </div>
+                                <div className="members-grid">
+                                    {members.map((m: any, i: number) => (
+                                        <div key={m.user_id} style={{
+                                            background: m.user_id === user?.id
+                                                ? "rgba(124,58,237,.12)" : "rgba(255,255,255,.025)",
+                                            border: `1px solid ${m.user_id === user?.id
+                                                ? "rgba(168,85,247,.3)" : "rgba(255,255,255,.06)"}`,
+                                            borderRadius: 12, padding: "12px 14px",
+                                            display: "flex", alignItems: "center", gap: 12,
+                                            animation: `fadeIn .3s ease-out ${i * .05}s both`
+                                        }}>
+                                            <div style={{
+                                                width: 36, height: 36, borderRadius: "50%",
+                                                backgroundImage: `linear-gradient(135deg,${clan.badge_color}88,${clan.badge_color}44)`,
+                                                display: "flex", alignItems: "center",
+                                                justifyContent: "center", fontSize: 14,
+                                                fontWeight: 700, fontFamily: "Cinzel",
+                                                flexShrink: 0
+                                            }}>
+                                                {m.username?.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{
+                                                    fontWeight: 700, fontSize: 13,
+                                                    overflow: "hidden", textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                    color: m.user_id === user?.id ? "#c084fc" : "#e2e8f0"
+                                                }}>
+                                                    {m.username}
+                                                    {m.user_id === user?.id && (
+                                                        <span style={{
+                                                            fontSize: 9, color: "#7c3aed",
+                                                            marginLeft: 6
+                                                        }}>(you)</span>
+                                                    )}
+                                                </div>
+                                                <div style={{ fontSize: 10, color: "#6b7280", marginTop: 1 }}>
+                                                    Lv.{m.level} · {(m.xp || 0).toLocaleString()} XP
+                                                </div>
+                                            </div>
+                                            <div style={{
+                                                fontSize: 10, color: ROLE_COLORS[m.role] || "#6b7280",
+                                                fontWeight: 700, flexShrink: 0
+                                            }}>
+                                                {m.role === "leader" ? "👑" : m.role === "co_leader" ? "⭐" : ""}
+                                                {m.role === "leader" ? "L" : m.role === "co_leader" ? "CL" : ""}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── STUDY ROOM TAB ────────────────────────────────────── */}
+                        {tab === "room" && (
+                            <div style={{ animation: "fadeIn .3s ease-out" }}>
+                                <div style={{
+                                    backgroundImage: "linear-gradient(135deg,rgba(6,182,212,.08),rgba(0,0,0,.5))",
+                                    border: "1px solid rgba(6,182,212,.18)",
+                                    borderRadius: 18, overflow: "hidden"
+                                }}>
+                                    {/* Chat header */}
+                                    <div style={{
+                                        background: "rgba(0,0,0,.5)",
+                                        borderBottom: "1px solid rgba(6,182,212,.12)",
+                                        padding: "12px 18px", display: "flex",
+                                        justifyContent: "space-between", alignItems: "center"
+                                    }}>
+                                        <div style={{
+                                            fontFamily: "Cinzel", fontSize: 12,
+                                            fontWeight: 700, color: "#22d3ee",
+                                            letterSpacing: ".15em"
+                                        }}>
+                                            💬 STUDY ROOM — {clan.name}
+                                        </div>
+                                        <div style={{
+                                            fontSize: 10, color: "#22c55e",
+                                            fontWeight: 700, animation: "pulse 1.5s infinite"
+                                        }}>
+                                            ● LIVE
+                                        </div>
+                                    </div>
+
+                                    {/* Messages */}
+                                    <div ref={chatRef} style={{
+                                        height: "clamp(300px,45vh,460px)",
+                                        overflowY: "auto", padding: "14px 18px",
+                                        display: "flex", flexDirection: "column", gap: 12
+                                    }}>
+                                        {messages.length === 0 && (
+                                            <div style={{
+                                                textAlign: "center", padding: 40,
+                                                color: "#374151", fontSize: 13
+                                            }}>
+                                                No messages yet. Start the study session!
+                                            </div>
+                                        )}
+                                        {messages.map((msg, i) => (
+                                            <div key={msg.id} style={{
+                                                display: "flex", gap: 10, alignItems: "flex-start",
+                                                animation: `fadeIn .2s ease-out ${i * .02}s both`,
+                                                flexDirection: msg.user_id === user?.id ? "row-reverse" : "row"
+                                            }}>
+                                                <div style={{
+                                                    width: 32, height: 32, borderRadius: "50%",
+                                                    backgroundImage: msg.user_id === user?.id
+                                                        ? "linear-gradient(135deg,#7c3aed,#db2777)"
+                                                        : `linear-gradient(135deg,${clan.badge_color}88,${clan.badge_color}44)`,
+                                                    display: "flex", alignItems: "center",
+                                                    justifyContent: "center", fontSize: 12,
+                                                    fontWeight: 700, flexShrink: 0
+                                                }}>
+                                                    {msg.username?.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div style={{
+                                                    maxWidth: "72%",
+                                                    textAlign: msg.user_id === user?.id ? "right" : "left"
+                                                }}>
+                                                    <div style={{
+                                                        fontSize: 10, color: "#6b7280",
+                                                        marginBottom: 3, display: "flex", alignItems: "center",
+                                                        gap: 5,
+                                                        justifyContent: msg.user_id === user?.id
+                                                            ? "flex-end" : "flex-start"
+                                                    }}>
+                                                        <span>{MSG_TYPE_ICONS[msg.msg_type] || "💬"}</span>
+                                                        <strong style={{ color: MSG_TYPE_COLORS[msg.msg_type] || "#9ca3af" }}>
+                                                            {msg.username}
+                                                        </strong>
+                                                        <span>·</span>
+                                                        <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                                                    </div>
+                                                    <div style={{
+                                                        background: msg.user_id === user?.id
+                                                            ? "rgba(124,58,237,.25)"
+                                                            : msg.msg_type === "question"
+                                                                ? "rgba(96,165,250,.12)"
+                                                                : msg.msg_type === "announcement"
+                                                                    ? "rgba(251,191,36,.12)"
+                                                                    : "rgba(255,255,255,.06)",
+                                                        border: `1px solid ${msg.user_id === user?.id
+                                                            ? "rgba(168,85,247,.3)"
+                                                            : msg.msg_type === "question"
+                                                                ? "rgba(96,165,250,.3)"
+                                                                : msg.msg_type === "announcement"
+                                                                    ? "rgba(251,191,36,.3)"
+                                                                    : "rgba(255,255,255,.08)"}`,
+                                                        borderRadius: msg.user_id === user?.id
+                                                            ? "14px 14px 4px 14px"
+                                                            : "14px 14px 14px 4px",
+                                                        padding: "9px 13px", fontSize: 13,
+                                                        color: "#e2e8f0", lineHeight: 1.55,
+                                                        wordBreak: "break-word"
+                                                    }}>
+                                                        {msg.body}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Message type selector */}
+                                    <div style={{
+                                        borderTop: "1px solid rgba(255,255,255,.05)",
+                                        padding: "10px 18px 0",
+                                        display: "flex", gap: 6
+                                    }}>
+                                        {Object.entries(MSG_TYPE_ICONS).map(([type, icon]) => (
+                                            <button key={type} onClick={() => setMsgType(type)} style={{
+                                                background: msgType === type
+                                                    ? `${MSG_TYPE_COLORS[type]}22` : "transparent",
+                                                border: `1px solid ${msgType === type
+                                                    ? MSG_TYPE_COLORS[type] + "44" : "rgba(255,255,255,.06)"}`,
+                                                borderRadius: 20, padding: "4px 10px",
+                                                fontSize: 11, cursor: "pointer",
+                                                color: msgType === type
+                                                    ? MSG_TYPE_COLORS[type] : "#6b7280",
+                                                fontWeight: 600, transition: "all .15s"
+                                            }}>
+                                                {icon} {type}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Input */}
+                                    <div style={{
+                                        padding: "10px 18px 18px",
+                                        display: "flex", gap: 8
+                                    }}>
+                                        <input value={msgInput}
+                                            onChange={e => setMsgInput(e.target.value)}
+                                            onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
+                                            placeholder={`Send a ${msgType}... (Enter to send)`}
+                                            style={{
+                                                flex: 1, background: "rgba(0,0,0,.5)",
+                                                border: "1px solid rgba(255,255,255,.1)",
+                                                borderRadius: 12, padding: "11px 14px",
+                                                color: "#e2e8f0", fontSize: 13,
+                                                fontFamily: "Rajdhani", fontWeight: 500, outline: "none"
+                                            }} />
+                                        <button onClick={handleSendMessage}
+                                            disabled={!msgInput.trim()}
+                                            style={{
+                                                backgroundImage: "linear-gradient(135deg,#06b6d4,#0891b2)",
+                                                border: "none", borderRadius: 12, padding: "11px 18px",
+                                                color: "#fff", cursor: "pointer", fontSize: 16,
+                                                opacity: msgInput.trim() ? 1 : .4
+                                            }}>
+                                            ➤
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── WAR TAB ───────────────────────────────────────────── */}
+                        {tab === "war" && (
+                            <div style={{ animation: "fadeIn .3s ease-out" }}>
+
+                                {/* Disclaimer */}
+                                <div style={{
+                                    backgroundImage: "linear-gradient(135deg,rgba(30,58,138,.3),rgba(88,28,135,.3))",
+                                    border: "1px solid rgba(99,102,241,.3)",
+                                    borderRadius: 14, padding: "16px 20px", marginBottom: 20
+                                }}>
+                                    <div style={{
+                                        fontFamily: "Cinzel", fontSize: 12,
+                                        fontWeight: 700, color: "#818cf8",
+                                        letterSpacing: ".15em", marginBottom: 8
+                                    }}>
+                                        ☮️ ABOUT CLAN WARS
+                                    </div>
+                                    <p style={{ fontSize: 13, color: "#a5b4fc", lineHeight: 1.7, margin: 0 }}>
+                                        <strong>EduRPG is firmly against real-world conflict.</strong> Clan Wars
+                                        are a <strong>purely academic competition</strong> — students battle by
+                                        answering quiz questions, not through any form of aggression. The goal
+                                        is learning together, testing knowledge and celebrating academic
+                                        excellence. Win with wisdom, not weapons. 📚
+                                    </p>
+                                </div>
+
+                                {warData?.has_war ? (
+                                    <WarView
+                                        warData={warData}
+                                        clan={clan}
+                                        userId={user?.id}
+                                        isLeader={isLeader}
+                                        members={members}
+                                        onRefresh={loadWar}
+                                        token={token || ""}
+                                    />
+                                ) : (
+                                    <NoClanWar
+                                        isLeader={isLeader}
+                                        clanId={clan.id}
+                                        token={token || ""}
+                                        onDeclared={loadWar}
+                                    />
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── RECRUIT TAB (leaders only) ────────────────────────── */}
+                        {tab === "search" && isLeader && (
+                            <div style={{ animation: "fadeIn .3s ease-out" }}>
+                                <div style={{
+                                    fontFamily: "Cinzel", fontSize: 12,
+                                    color: "#6b7280", letterSpacing: ".15em",
+                                    fontWeight: 700, marginBottom: 16
+                                }}>
+                                    BROWSE & RECRUIT PLAYERS
+                                </div>
+                                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                                    <input value={searchQ}
+                                        onChange={e => setSearchQ(e.target.value)}
+                                        onKeyDown={e => e.key === "Enter" && handleSearch()}
+                                        placeholder="Search clans..."
+                                        style={{
+                                            flex: 1, background: "rgba(0,0,0,.5)",
+                                            border: "1px solid rgba(255,255,255,.1)",
+                                            borderRadius: 12, padding: "12px 16px",
+                                            color: "#e2e8f0", fontSize: 14,
+                                            fontFamily: "Rajdhani", fontWeight: 500, outline: "none"
+                                        }} />
+                                    <button onClick={handleSearch} style={{
+                                        backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d)",
+                                        border: "none", borderRadius: 12, padding: "12px 20px",
+                                        color: "#fff", fontFamily: "Cinzel",
+                                        fontSize: 12, fontWeight: 700, cursor: "pointer"
+                                    }}>
+                                        🔍
+                                    </button>
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                    {searchResults.map((c, i) => (
+                                        <ClanCard key={c.id} clan={c} i={i} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
-          </div>
-        )}
-
-        {/* Submit */}
-        {allAnswered && !submitting && (
-          <div style={{ textAlign:"center", animation:"wFadeIn .3s ease-out" }}>
-            <div style={{ color:"#22c55e", fontSize:13, fontWeight:700, marginBottom:14 }}>✅ Battle complete!</div>
-            <button onClick={() => doSubmit()} style={{
-              backgroundImage:"linear-gradient(135deg,#dc2626,#991b1b)",
-              border:"none", borderRadius:12, padding:"14px 48px",
-              color:"#fff", fontFamily:"Cinzel", fontSize:15,
-              fontWeight:700, cursor:"pointer", letterSpacing:".1em",
-              boxShadow:"0 0 24px rgba(220,38,38,.4)" }}>
-              ⚔️ SUBMIT BATTLE
-            </button>
-          </div>
-        )}
-
-        {submitting && (
-          <div style={{ textAlign:"center", padding:24 }}>
-            <div style={{ fontSize:40, animation:"wSpin 1s linear infinite", display:"inline-block" }}>⚔️</div>
-            <div style={{ color:"#9ca3af", marginTop:8, fontSize:13 }}>Submitting to war score...</div>
-          </div>
-        )}
-
-        {error && (
-          <div style={{ background:"rgba(127,29,29,.3)", border:"1px solid rgba(239,68,68,.3)",
-            borderRadius:10, padding:"10px 14px", fontSize:12, color:"#fca5a5", textAlign:"center", marginTop:10 }}>
-            ⚠️ {error}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+        </div>
+    );
 }
 
-export default function WarBattlePage() {
-  return (
-    <Suspense fallback={<div style={{padding:40}}>Loading battle...</div>}>
-      <WarBattlePageContent />
-    </Suspense>
-  );
+// ── Sub-components ──────────────────────────────────────────────────
+
+function ClanCard({ clan, i, onJoin }: { clan: any; i: number; onJoin?: () => void }) {
+    return (
+        <div style={{
+            backgroundImage: `linear-gradient(135deg,${clan.badge_color}10,rgba(0,0,0,.4))`,
+            border: `1px solid ${clan.badge_color}28`,
+            borderRadius: 14, padding: "14px 18px",
+            display: "flex", alignItems: "center",
+            justifyContent: "space-between", gap: 12,
+            animation: `fadeIn .3s ease-out ${i * .06}s both`,
+            flexWrap: "wrap"
+        }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{
+                    fontSize: 32,
+                    filter: `drop-shadow(0 0 8px ${clan.badge_color})`
+                }}>
+                    {clan?.badge_emoji}
+                </span>
+                <div>
+                    <div style={{
+                        fontFamily: "Cinzel", fontSize: 15,
+                        fontWeight: 700, color: clan.badge_color
+                    }}>
+                        {clan.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                        {clan.tag} · {clan.member_count} members · Level {clan.level}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1 }}>
+                        Leader: {clan.leader_name} · {(clan.total_xp || 0).toLocaleString()} XP
+                    </div>
+                </div>
+            </div>
+            {onJoin && (
+                <button onClick={onJoin} style={{
+                    backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d)",
+                    border: "none", borderRadius: 10, padding: "9px 18px",
+                    color: "#fff", fontFamily: "Cinzel",
+                    fontSize: 11, fontWeight: 700, cursor: "pointer",
+                    boxShadow: "0 0 14px rgba(124,58,237,.35)",
+                    whiteSpace: "nowrap"
+                }}>
+                    JOIN →
+                </button>
+            )}
+        </div>
+    );
+}
+
+function NoClanWar({ isLeader, clanId, token, onDeclared }:
+    { isLeader: boolean; clanId: string; token: string; onDeclared: () => void }) {
+    const [targetId, setTargetId] = useState("");
+    const [topic, setTopic] = useState("python-basics");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const declare = async () => {
+        if (!targetId.trim()) return;
+        setLoading(true); setError("");
+        try {
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/clan/war/declare`,
+                { target_clan_id: targetId, topic }, { headers });
+            onDeclared();
+        } catch (e: any) {
+            setError(e.response?.data?.detail || "Could not declare war");
+        } finally { setLoading(false); }
+    };
+
+    return (
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+            <div style={{
+                fontSize: 64, marginBottom: 16,
+                filter: "drop-shadow(0 0 16px rgba(239,68,68,.6))"
+            }}>⚔️</div>
+            <div style={{
+                fontFamily: "Cinzel", fontSize: 22,
+                fontWeight: 700, color: "#9ca3af", marginBottom: 8
+            }}>
+                NO ACTIVE WAR
+            </div>
+            <p style={{ color: "#4b5563", fontSize: 14, marginBottom: 28 }}>
+                Your clan is at peace. Challenge another clan to a knowledge battle!
+            </p>
+            {isLeader && (
+                <div style={{
+                    background: "rgba(0,0,0,.4)",
+                    border: "1px solid rgba(239,68,68,.2)",
+                    borderRadius: 16, padding: "24px",
+                    maxWidth: 400, margin: "0 auto",
+                    textAlign: "left"
+                }}>
+                    <div style={{
+                        fontFamily: "Cinzel", fontSize: 12,
+                        fontWeight: 700, color: "#f87171",
+                        letterSpacing: ".15em", marginBottom: 16
+                    }}>
+                        🚨 DECLARE ACADEMIC WAR
+                    </div>
+                    {error && (
+                        <div style={{
+                            background: "rgba(127,29,29,.3)",
+                            border: "1px solid rgba(239,68,68,.3)",
+                            borderRadius: 8, padding: "8px 12px",
+                            fontSize: 12, color: "#fca5a5",
+                            marginBottom: 12
+                        }}>
+                            {error}
+                        </div>
+                    )}
+                    <input value={targetId}
+                        onChange={e => setTargetId(e.target.value)}
+                        placeholder="Target Clan ID"
+                        style={{
+                            width: "100%", background: "rgba(0,0,0,.5)",
+                            border: "1px solid rgba(255,255,255,.1)",
+                            borderRadius: 10, padding: "11px 14px",
+                            color: "#e2e8f0", fontSize: 13,
+                            fontFamily: "Rajdhani", fontWeight: 500,
+                            outline: "none", marginBottom: 10
+                        }} />
+                    <select value={topic}
+                        onChange={e => setTopic(e.target.value)}
+                        style={{
+                            width: "100%", background: "#0a0a15",
+                            border: "1px solid rgba(255,255,255,.1)",
+                            borderRadius: 10, padding: "11px 14px",
+                            color: "#e2e8f0", fontSize: 13,
+                            fontFamily: "Rajdhani", outline: "none",
+                            marginBottom: 14
+                        }}>
+                        {["python-basics", "python-loops", "algebra-basics", "calculus",
+                            "physics-mechanics", "chemistry", "machine-learning"].map(t => (
+                                <option key={t} value={t}>
+                                    {t.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                                </option>
+                            ))}
+                    </select>
+                    <button onClick={declare} disabled={loading || !targetId.trim()}
+                        style={{
+                            width: "100%",
+                            backgroundImage: "linear-gradient(135deg,#dc2626,#991b1b)",
+                            border: "none", borderRadius: 10, padding: "12px",
+                            color: "#fff", fontFamily: "Cinzel",
+                            fontSize: 13, fontWeight: 700, cursor: "pointer",
+                            opacity: (!targetId.trim() || loading) ? .5 : 1,
+                            boxShadow: "0 0 20px rgba(220,38,38,.4)"
+                        }}>
+                        {loading ? "⏳ Declaring..." : "⚔️ DECLARE WAR"}
+                    </button>
+                    <p style={{
+                        fontSize: 10, color: "#4b5563",
+                        marginTop: 10, textAlign: "center"
+                    }}>
+                        24h preparation, then 24h war window
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
+    {
+        warData: any; clan: any; userId: string; isLeader: boolean;
+        members: any[]; onRefresh: () => void; token: string
+    }) {
+    const war = warData.war;
+    const matchups = warData.matchups || [];
+    const mine = warData.my_matchups || [];
+    const [assigning, setAssigning] = useState(false);
+    const [form, setForm] = useState({ attacker_id: "", defender_id: "", topic: "python-basics" });
+    const [error, setError] = useState("");
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const isA = war.clan_a_id === clan.id;
+    const myScore = isA ? war.clan_a_score : war.clan_b_score;
+    const theirScore = isA ? war.clan_b_score : war.clan_a_score;
+    const enemyName = isA ? war.clan_b_name : war.clan_a_name;
+    const winning = myScore > theirScore;
+    const statusColor = war.status === "ended"
+        ? (war.winner_clan_id === clan.id ? "#22c55e" : "#ef4444") : "#fbbf24";
+
+    const assign = async () => {
+        setError("");
+        try {
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/clan/war/assign`,
+                { war_id: war.id, ...form }, { headers });
+            setAssigning(false);
+            onRefresh();
+        } catch (e: any) {
+            setError(e.response?.data?.detail || "Error assigning matchup");
+        }
+    };
+
+    return (
+        <div>
+            {/* Scoreboard */}
+            <div style={{
+                backgroundImage: "linear-gradient(135deg,rgba(220,38,38,.15),rgba(0,0,0,.5))",
+                border: `2px solid ${statusColor}35`,
+                borderRadius: 18, padding: "clamp(16px,4vw,24px)",
+                marginBottom: 20, textAlign: "center"
+            }}>
+                <div style={{
+                    fontSize: 10, color: statusColor,
+                    fontFamily: "Cinzel", letterSpacing: ".2em",
+                    fontWeight: 700, marginBottom: 12
+                }}>
+                    {war.status === "preparation" ? "⏳ PREPARATION PHASE"
+                        : war.status === "active" ? "⚔️ WAR IN PROGRESS"
+                            : war.winner_clan_id === clan.id ? "🏆 VICTORY!"
+                                : war.winner_clan_id ? "💀 DEFEAT" : "🤝 DRAW"}
+                </div>
+                <div style={{
+                    display: "flex", alignItems: "center",
+                    justifyContent: "center", gap: "clamp(16px,5vw,40px)"
+                }}>
+                    <div style={{ textAlign: "center" }}>
+                        <div style={{
+                            fontSize: "clamp(22px,6vw,32px)",
+                            fontFamily: "Cinzel", fontWeight: 900,
+                            color: winning ? "#22c55e" : "#e2e8f0"
+                        }}>
+                            {myScore}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
+                            {clan?.badge_emoji} {clan.name}
+                        </div>
+                    </div>
+                    <div style={{
+                        fontFamily: "Cinzel",
+                        fontSize: "clamp(20px,5vw,28px)", fontWeight: 900,
+                        color: "#ef4444"
+                    }}>VS</div>
+                    <div style={{ textAlign: "center" }}>
+                        <div style={{
+                            fontSize: "clamp(22px,6vw,32px)",
+                            fontFamily: "Cinzel", fontWeight: 900,
+                            color: !winning ? "#22c55e" : "#e2e8f0"
+                        }}>
+                            {theirScore}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
+                            ⚔️ {enemyName}
+                        </div>
+                    </div>
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 12 }}>
+                    Topic: <span style={{ color: "#c084fc", fontWeight: 700 }}>
+                        {war.topic.replace(/-/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                    </span>
+                    {" · "}Ends: {new Date(war.end_time).toLocaleString()}
+                </div>
+            </div>
+
+            {/* Assign matchup (leader only) */}
+            {isLeader && war.status !== "ended" && (
+                <div style={{ marginBottom: 20 }}>
+                    <button onClick={() => setAssigning(v => !v)} style={{
+                        backgroundImage: "linear-gradient(135deg,#dc2626,#7c3aed)",
+                        border: "none", borderRadius: 12, padding: "11px 24px",
+                        color: "#fff", fontFamily: "Cinzel",
+                        fontSize: 12, fontWeight: 700, cursor: "pointer",
+                        letterSpacing: ".08em", marginBottom: assigning ? 14 : 0
+                    }}>
+                        {assigning ? "✕ Cancel" : "⚔️ ASSIGN MATCHUP"}
+                    </button>
+                    {assigning && (
+                        <div style={{
+                            background: "rgba(0,0,0,.4)",
+                            border: "1px solid rgba(255,255,255,.08)",
+                            borderRadius: 14, padding: "18px",
+                            animation: "slideUp .25s ease-out"
+                        }}>
+                            {error && <div style={{
+                                color: "#f87171",
+                                fontSize: 12, marginBottom: 10
+                            }}>{error}</div>}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                <select value={form.attacker_id}
+                                    onChange={e => setForm({ ...form, attacker_id: e.target.value })}
+                                    style={{
+                                        background: "#0a0a15",
+                                        border: "1px solid rgba(255,255,255,.1)",
+                                        borderRadius: 10, padding: "10px 14px",
+                                        color: "#e2e8f0", fontSize: 13,
+                                        fontFamily: "Rajdhani", outline: "none"
+                                    }}>
+                                    <option value="">Select YOUR member (attacker)...</option>
+                                    {members.map(m => (
+                                        <option key={m.user_id} value={m.user_id}>
+                                            {m.username} (Lv.{m.level})
+                                        </option>
+                                    ))}
+                                </select>
+                                <input value={form.defender_id}
+                                    onChange={e => setForm({ ...form, defender_id: e.target.value })}
+                                    placeholder="Enemy player ID to defend"
+                                    style={{
+                                        background: "rgba(0,0,0,.5)",
+                                        border: "1px solid rgba(255,255,255,.1)",
+                                        borderRadius: 10, padding: "10px 14px",
+                                        color: "#e2e8f0", fontSize: 13,
+                                        fontFamily: "Rajdhani", fontWeight: 500,
+                                        outline: "none"
+                                    }} />
+                                <select value={form.topic}
+                                    onChange={e => setForm({ ...form, topic: e.target.value })}
+                                    style={{
+                                        background: "#0a0a15",
+                                        border: "1px solid rgba(255,255,255,.1)",
+                                        borderRadius: 10, padding: "10px 14px",
+                                        color: "#e2e8f0", fontSize: 13,
+                                        fontFamily: "Rajdhani", outline: "none"
+                                    }}>
+                                    {["python-basics", "python-loops", "python-functions",
+                                        "algebra-basics", "calculus", "physics-mechanics",
+                                        "chemistry", "machine-learning", "neural-networks"].map(t => (
+                                            <option key={t} value={t}>
+                                                {t.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                                            </option>
+                                        ))}
+                                </select>
+                                <button onClick={assign}
+                                    disabled={!form.attacker_id || !form.defender_id}
+                                    style={{
+                                        backgroundImage: "linear-gradient(135deg,#dc2626,#991b1b)",
+                                        border: "none", borderRadius: 10, padding: "11px",
+                                        color: "#fff", fontFamily: "Cinzel",
+                                        fontSize: 12, fontWeight: 700, cursor: "pointer",
+                                        opacity: (!form.attacker_id || !form.defender_id) ? .5 : 1
+                                    }}>
+                                    ⚔️ ASSIGN BATTLE
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Matchups list */}
+            <div style={{
+                fontFamily: "Cinzel", fontSize: 12, fontWeight: 700,
+                color: "#9ca3af", letterSpacing: ".15em", marginBottom: 12
+            }}>
+                BATTLE MATCHUPS ({matchups.length})
+            </div>
+            <div className="war-matchups">
+                {matchups.map((m: any, i: number) => (
+                    <div key={m.id} style={{
+                        background: m.result === "attacker_won"
+                            ? "rgba(34,197,94,.08)" : m.result === "defender_won"
+                                ? "rgba(239,68,68,.08)" : "rgba(255,255,255,.025)",
+                        border: `1px solid ${m.result === "attacker_won"
+                            ? "rgba(34,197,94,.25)" : m.result === "defender_won"
+                                ? "rgba(239,68,68,.25)" : "rgba(255,255,255,.07)"}`,
+                        borderRadius: 12, padding: "12px 16px",
+                        display: "flex", alignItems: "center",
+                        justifyContent: "space-between", gap: 10,
+                        flexWrap: "wrap",
+                        animation: `fadeIn .3s ease-out ${i * .06}s both`
+                    }}>
+                        <div>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>
+                                <span style={{ color: "#60a5fa" }}>{m.attacker_name}</span>
+                                <span style={{ color: "#6b7280", margin: "0 8px" }}>vs</span>
+                                <span style={{ color: "#f87171" }}>{m.defender_name}</span>
+                            </div>
+                            <div style={{ fontSize: 10, color: "#6b7280", marginTop: 3 }}>
+                                {m.topic.replace(/-/g, " ")} ·{" "}
+                                {m.status === "completed"
+                                    ? `${m.attacker_score} - ${m.defender_score}`
+                                    : "Pending"}
+                            </div>
+                        </div>
+                        <div style={{
+                            fontSize: 12, fontWeight: 700,
+                            color: m.result === "attacker_won" ? "#22c55e"
+                                : m.result === "defender_won" ? "#ef4444"
+                                    : m.result === "draw" ? "#f59e0b" : "#6b7280"
+                        }}>
+                            {m.result === "attacker_won" ? "⚔️ Attacker Won"
+                                : m.result === "defender_won" ? "🛡️ Defender Won"
+                                    : m.result === "draw" ? "🤝 Draw"
+                                        : "⏳ In Progress"}
+                        </div>
+                    </div>
+                ))}
+                {matchups.length === 0 && (
+                    <div style={{
+                        textAlign: "center", padding: 32,
+                        color: "#374151", fontSize: 13
+                    }}>
+                        No matchups assigned yet.
+                        {isLeader ? " Use 'Assign Matchup' to deploy your warriors." : ""}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 }
