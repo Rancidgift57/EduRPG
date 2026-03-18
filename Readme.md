@@ -47,6 +47,8 @@
   - [Deploy Backend on Render](#deploy-backend-on-render)
   - [Deploy Frontend on Vercel](#deploy-frontend-on-vercel)
 - [Troubleshooting](#-troubleshooting)
+- [Credits & Acknowledgements](#-credits--acknowledgements)
+- [References & Inspirations](#-references--inspirations)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -666,7 +668,7 @@ CREATE TABLE player_rankings (
 );
 ```
 
-### `clans` *(New — Clan War System)*
+### `clans`
 ```sql
 CREATE TABLE clans (
     id           TEXT PRIMARY KEY,        -- UUID
@@ -683,7 +685,7 @@ CREATE TABLE clans (
 );
 ```
 
-### `clan_members` *(New — Clan War System)*
+### `clan_members`
 ```sql
 CREATE TABLE clan_members (
     id         TEXT PRIMARY KEY,
@@ -697,7 +699,7 @@ CREATE TABLE clan_members (
 );
 ```
 
-### `clan_wars` *(New — Clan War System)*
+### `clan_wars`
 ```sql
 CREATE TABLE clan_wars (
     id               TEXT PRIMARY KEY,
@@ -716,7 +718,7 @@ CREATE TABLE clan_wars (
 );
 ```
 
-### `war_battles` *(New — Clan War System)*
+### `war_battles`
 ```sql
 CREATE TABLE war_battles (
     id              TEXT PRIMARY KEY,
@@ -795,6 +797,7 @@ Full interactive API docs available at `http://localhost:8000/docs` when running
 | GET | `/battle/state/{session_id}` | Get battle state | Yes |
 | GET | `/battle/history` | Get battle history | Yes |
 | POST | `/battle/forfeit/{session_id}` | Forfeit battle | Yes |
+| POST | `/battle/hint` | Get hint for Wizard skill | Yes |
 
 **Start Battle Request:**
 ```json
@@ -826,9 +829,7 @@ Full interactive API docs available at `http://localhost:8000/docs` when running
   "question": {
     "id": "uuid",
     "body": "What does range(3) produce?",
-    "options": ["[1,2,3]", "[0,1,2]", "[0,1,2,3]", "[1,2]"],
-    "correct_index": 1,
-    "explanation": "range(3) starts at 0 and goes up to but not including 3"
+    "options": ["[1,2,3]", "[0,1,2]", "[0,1,2,3]", "[1,2]"]
   },
   "player_hp": 90,
   "monster_hp": 100
@@ -849,6 +850,7 @@ Full interactive API docs available at `http://localhost:8000/docs` when running
 {
   "action": "hero_attack",
   "is_correct": true,
+  "correct_index": 1,
   "damage": 38,
   "is_critical": true,
   "xp_gained": 25,
@@ -872,17 +874,6 @@ Full interactive API docs available at `http://localhost:8000/docs` when running
 | POST | `/ai/simplify` | Simplify a concept | Yes |
 | GET | `/ai/status` | Check AI health | No |
 
-**Explain Request:**
-```json
-{
-  "question": "What does range(3) produce?",
-  "student_answer": "[1,2,3]",
-  "correct_answer": "[0,1,2]",
-  "subject": "Programming",
-  "user_level": 3
-}
-```
-
 ---
 
 ### Multiplayer Endpoints
@@ -900,68 +891,23 @@ Full interactive API docs available at `http://localhost:8000/docs` when running
 
 ---
 
-### Clan War Endpoints *(New)*
+### Clan War Endpoints
 
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
-| POST | `/clans/create` | Create a new clan | Yes |
-| POST | `/clans/join/{clan_id}` | Join an existing clan | Yes |
-| POST | `/clans/leave` | Leave your current clan | Yes |
-| GET | `/clans/my-clan` | Get your clan details + members | Yes |
-| GET | `/clans/search` | Search clans by name or tag | No |
-| GET | `/clans/{clan_id}` | Get public clan profile | No |
-| POST | `/clans/promote/{user_id}` | Promote member to co-leader | Yes (leader) |
-| DELETE | `/clans/kick/{user_id}` | Remove a member from clan | Yes (leader) |
-| POST | `/clans/war/challenge/{clan_id}` | Challenge another clan to war | Yes (leader) |
-| POST | `/clans/war/set-roster` | Set war roster + battle order | Yes (leader) |
-| GET | `/clans/war/active` | Get current active war | Yes |
-| POST | `/clans/war/battle/start/{war_battle_id}` | Start your assigned war battle | Yes |
-| POST | `/clans/war/battle/answer` | Submit answer in a war battle | Yes |
-| GET | `/clans/war/{war_id}/results` | Get full war results | Yes |
-| GET | `/clans/war/history` | Get clan's past wars | Yes |
-| GET | `/clans/leaderboard` | Clan trophy leaderboard | No |
-
-**Create Clan Request:**
-```json
-{
-  "name": "Math Warriors",
-  "tag": "MATHW",
-  "description": "We grind calculus and conquer all"
-}
-```
-
-**Create Clan Response:**
-```json
-{
-  "clan_id": "uuid",
-  "name": "Math Warriors",
-  "tag": "#MATHW",
-  "leader_id": "uuid",
-  "members": 1,
-  "trophies": 0
-}
-```
-
-**Challenge Clan Request:**
-```json
-{
-  "opponent_clan_id": "uuid",
-  "topic": "calculus",
-  "war_size": 5
-}
-```
-
-**Set Roster Request (leader only):**
-```json
-{
-  "war_id": "uuid",
-  "roster": [
-    { "battle_order": 1, "member_user_id": "uuid-alice", "topic": "calculus" },
-    { "battle_order": 2, "member_user_id": "uuid-bob",   "topic": "algebra-basics" },
-    { "battle_order": 3, "member_user_id": "uuid-carol", "topic": "calculus" }
-  ]
-}
-```
+| POST | `/clan/create` | Create a new clan | Yes |
+| POST | `/clan/join/{clan_id}` | Join an existing clan | Yes |
+| POST | `/clan/leave` | Leave your current clan | Yes |
+| GET | `/clan/mine` | Get your clan details + members | Yes |
+| GET | `/clan/search` | Search clans by name or tag | No |
+| GET | `/clan/{clan_id}` | Get public clan profile | No |
+| POST | `/clan/promote` | Promote/demote a member | Yes (leader) |
+| POST | `/clan/war/declare` | Challenge another clan to war | Yes (leader) |
+| POST | `/clan/war/assign` | Assign member matchups | Yes (leader) |
+| GET | `/clan/war/active/mine` | Get current active war | Yes |
+| POST | `/clan/war/battle` | Submit war battle score | Yes |
+| GET | `/clan/war/{war_id}` | Get full war results | Yes |
+| GET | `/clan/leaderboard` | Clan trophy leaderboard | No |
 
 ---
 
@@ -1016,7 +962,7 @@ scaled_atk = ceil(base_attack * (1 + user_level * 0.05))
 | Hero | Subject | Attack | Defense | HP | Skill | Unlocks |
 | :--- | :--- | :---: | :---: | :---: | :--- | :--- |
 | ⚔️ **Samurai** | Mathematics | 25 | 12 | 110 | **Double Strike** (2× damage) | Level 1 |
-| 🔮 **Wizard** | Programming | 30 | 8 | 90 | **Hint Spell** (reveal wrong option) | Level 1 |
+| 🔮 **Wizard** | Programming | 30 | 8 | 90 | **Hint Spell** (eliminate wrong option) | Level 1 |
 | 🏹 **Archer** | Science | 22 | 11 | 105 | **Precise Shot** (guaranteed crit) | Level 1 |
 | 🥷 **Ninja** | Chemistry | 28 | 15 | 100 | **Shadow Dodge** (skip penalty) | Level 4 |
 | 🛡️ **Knight** | History | 18 | 22 | 140 | **Iron Shield** (50% dmg reduction) | Level 6 |
@@ -1106,9 +1052,7 @@ Complete Flow:
 
 ---
 
-### 🏰 Clan War System *(New)*
-
-Clan Wars turn studying into a full team sport. Form a study group as a clan, challenge your rivals, and prove your crew knows the subject best.
+### 🏰 Clan War System
 
 ```
 Complete Clan War Flow:
@@ -1123,54 +1067,26 @@ PHASE 0 — Setup
 PHASE 1 — Challenge (Preparation, 24 hrs)
 ──────────────────────────────────────────
 1. Leader opens /clans → clicks "Declare War"
-2. Searches for a rival clan (matched by similar clan trophies)
-3. Selects war size: 5v5, 10v10, or 15v15 battles
-4. Sets a primary topic (e.g. calculus) for the war
-5. Leader assigns the battle roster:
+2. Searches for a rival clan
+3. Sets the war topic (e.g. calculus)
+4. Leader assigns the battle roster:
    - Picks which members fight
-   - Sets the battle ORDER (who fights first, second, etc.)
-   - Optionally assigns a different topic per individual battle
-6. Both clans have 24 hours to finalize rosters
-   - Each side's leader sets their own roster independently
-   - Roster is hidden from the enemy until war starts
+   - Optionally assigns a different topic per battle
 
 PHASE 2 — War (Battle Window, 48 hrs)
 ───────────────────────────────────────
 1. War goes ACTIVE — all assigned battles unlock simultaneously
-2. Each member logs in → sees their war assignment:
-   "You are Battle #3 — fight PlayerX from Clan Rivals!"
-3. They click START BATTLE → a 10-question quiz begins
-4. Standard battle rules apply (correct = points, wrong = opponent's points)
-5. Each battle concludes independently — no waiting on teammates
-6. War score updates live:
-   "Math Warriors: 3 wins | Rivals FC: 1 win"
+2. Each member logs in → sees their war assignment
+3. They click START BATTLE → a quiz begins
+4. Standard battle rules apply
+5. War score updates live
 
 PHASE 3 — Results
 ──────────────────
-1. War ends when all battles complete OR 48hr timer runs out
+1. War ends when all battles complete OR timer runs out
 2. Clan with most battle wins takes the war
 3. Trophies transfer: winning clan +50, losing clan -30
 4. Each member earns personal XP for their battle outcome
-5. Clan War History shows all past wars with per-member stats
-```
-
-**War Score Logic:**
-```python
-# Each war battle is a standalone 10-question quiz
-# Battle winner = player with more correct answers
-# Ties count as 0.5 wins for each side
-
-clan_a_score = sum(1 for b in battles if b.winner == "clan_a")
-clan_b_score = sum(1 for b in battles if b.winner == "clan_b")
-
-# Draws: each gets 0.5
-for b in battles:
-    if b.clan_a_score == b.clan_b_score:
-        clan_a_score += 0.5
-        clan_b_score += 0.5
-
-war_winner = "clan_a" if clan_a_score > clan_b_score else "clan_b"
-# Perfect war bonus: win all battles → extra +100 clan XP
 ```
 
 **Clan Roles & Permissions:**
@@ -1180,20 +1096,6 @@ war_winner = "clan_a" if clan_a_score > clan_b_score else "clan_b"
 | 👑 Leader | ✅ | ✅ | ✅ | ✅ | ✅ |
 | ⭐ Co-Leader | ✅ | ✅ | ✅ (members only) | ❌ | ✅ |
 | 🧑 Member | ❌ | ❌ | ❌ | ❌ | ❌ |
-
-**Clan Trophy System:**
-```
-Clan War Win   → +50 clan trophies
-Clan War Loss  → -30 clan trophies
-Perfect War    → +25 bonus clan trophies (win all battles)
-
-Clan Leagues:
-0    - 299   → 🥉 Bronze Clan
-300  - 699   → 🥈 Silver Clan
-700  - 1499  → 🥇 Gold Clan
-1500 - 2999  → 💎 Diamond Clan
-3000+        → 👑 Legend Clan
-```
 
 ---
 
@@ -1207,13 +1109,6 @@ Fallback:  microsoft/Phi-3-mini-4k-instruct    (if primary busy)
 Fast:      HuggingFaceH4/zephyr-7b-beta        (if rate limited)
 Hardcoded: Local fallback questions             (if all AI down)
 ```
-
-**Features:**
-- Explains why the wrong answer was incorrect (2-3 sentences)
-- Gives hints without revealing the answer
-- Generates new quiz questions for any topic
-- Simplifies complex concepts with analogies
-- Adapts explanation to user's level (1-20)
 
 ---
 
@@ -1373,8 +1268,9 @@ Post-deploy ──────────────────────�
 | AI tutor returns empty | HuggingFace model loading | Wait 20s and retry — model is warming up (cold start) |
 | Battle gives 404 | Missing page files | Create `src/app/battle/page.tsx` etc. |
 | `clan_wars table not found` | DB not migrated after update | Re-run `python -m app.seed` or run migration script |
-| War roster returns 403 | Non-leader trying to set roster | Only leader/co-leader can call `/clans/war/set-roster` |
-| War battle shows wrong opponent | Roster set before opponent confirmed | Ensure both clans finalize roster before prep phase ends |
+| War roster returns 403 | Non-leader trying to set roster | Only leader/co-leader can call `/clan/war/assign` |
+| Hint spell eliminates correct answer | Backend hint endpoint missing | Add `POST /battle/hint` endpoint to `battle.py` |
+| Promote button not visible | User is not leader/co-leader | Only leaders and co-leaders see promote buttons |
 
 ### Debug Commands
 
@@ -1389,7 +1285,7 @@ curl http://localhost:8000/heroes/
 curl http://localhost:8000/ai/status
 
 # Check clan tables exist
-curl http://localhost:8000/clans/leaderboard
+curl http://localhost:8000/clan/leaderboard
 
 # Check frontend builds
 cd frontend && npm run build
@@ -1400,6 +1296,160 @@ uvicorn app.main:app --reload --log-level debug
 # Check for TypeScript errors
 cd frontend && npx tsc --noEmit
 ```
+
+---
+
+## 🏆 Credits & Acknowledgements
+
+### 👨‍💻 Project Author
+
+| | |
+|---|---|
+| **Name** | Nikhil Nair, Mohit Paradkar, Tanmay Rewale, Prem Rana |
+| **Project** | EduRPG — Built independently as a passion project for students who hate boring studying |
+
+---
+
+### 🛠️ Core Frameworks & Libraries
+
+| Technology | Role in EduRPG | Author/Org | License |
+|---|---|---|---|
+| [Next.js](https://nextjs.org) | React framework, App Router, SSR | Vercel | MIT |
+| [FastAPI](https://fastapi.tiangolo.com) | Backend REST API | Sebastián Ramírez | MIT |
+| [Pydantic v2](https://docs.pydantic.dev) | Data validation and settings | Samuel Colvin | MIT |
+| [Turso](https://turso.tech) | Edge SQLite cloud database | ChiselStrike | Proprietary (free tier) |
+| [python-jose](https://github.com/mpdavis/python-jose) | JWT token generation & validation | Michael Davis | MIT |
+| [bcrypt](https://github.com/pyca/bcrypt) | Password hashing | Python Cryptographic Authority | Apache 2.0 |
+| [Axios](https://axios-http.com) | HTTP client for API calls | Matt Zabriskie | MIT |
+| [Tailwind CSS](https://tailwindcss.com) | Utility-first CSS framework | Tailwind Labs | MIT |
+| [Uvicorn](https://www.uvicorn.org) | ASGI server for FastAPI | Tom Christie | BSD |
+| [Slowapi](https://github.com/laurentS/slowapi) | Rate limiting for FastAPI | Laurent S | MIT |
+
+---
+
+### 🤖 AI & Machine Learning
+
+| Model / Service | Role | Provider |
+|---|---|---|
+| [Mistral-7B-Instruct-v0.3](https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3) | Primary AI tutor — explains wrong answers, generates questions | Mistral AI |
+| [Phi-3-mini-4k-instruct](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct) | Fallback AI model — faster inference | Microsoft Research |
+| [Zephyr-7B-beta](https://huggingface.co/HuggingFaceH4/zephyr-7b-beta) | Secondary fallback AI | HuggingFace H4 |
+| [HuggingFace Inference API](https://huggingface.co/inference-api) | Free AI hosting infrastructure | HuggingFace |
+
+---
+
+### ☁️ Hosting & Infrastructure
+
+| Service | What It Hosts | Plan Used |
+|---|---|---|
+| [Vercel](https://vercel.com) | Next.js frontend | Free Hobby |
+| [Render](https://render.com) | FastAPI backend | Free Web Service |
+| [Turso](https://turso.tech) | SQLite cloud database | Free (8GB) |
+| [GitHub](https://github.com) | Source control & CI | Free |
+| [UptimeRobot](https://uptimerobot.com) | Backend keep-alive monitoring | Free (50 monitors) |
+
+---
+
+### 📚 Educational Content Sources
+
+All video content in the Training Room is from free, publicly available YouTube channels. No YouTube Data API is used — all links are curated by hand.
+
+| Creator | Channel | Topics Covered |
+|---|---|---|
+| **3Blue1Brown** | [@3blue1brown](https://www.youtube.com/@3blue1brown) | Calculus, Linear Algebra, Mathematics |
+| **Corey Schafer** | [@coreyms](https://www.youtube.com/@coreyms) | Python (all topics), OOP, Functions |
+| **freeCodeCamp** | [@freecodecamp](https://www.youtube.com/@freecodecamp) | Python Basics, ML, Full-Stack |
+| **Sentdex** | [@sentdex](https://www.youtube.com/@sentdex) | Machine Learning, Neural Networks |
+| **The Organic Chemistry Tutor** | [@TheOrganicChemistryTutor](https://www.youtube.com/@TheOrganicChemistryTutor) | Chemistry, Physics, Algebra |
+| **Khan Academy** | [@khanacademy](https://www.youtube.com/@khanacademy) | Algebra, Physics, General STEM |
+| **Professor Leonard** | [@ProfessorLeonard](https://www.youtube.com/@ProfessorLeonard) | Calculus series |
+| **StatQuest with Josh Starmer** | [@statquest](https://www.youtube.com/@statquest) | Machine Learning, Statistics |
+
+---
+
+### 🎮 Design Inspirations
+
+| Game / App | What EduRPG Borrowed |
+|---|---|
+| **Clash of Clans** (Supercell) | Async multiplayer attack/defense loop, clan war system, trophy leagues |
+| **Duolingo** | Daily streaks, XP system, gamified learning progression |
+| **Pokémon** | Turn-based combat mechanics, monster typing by subject |
+| **Final Fantasy** | Hero class system, skill names, RPG battle UI aesthetic |
+| **Dragon Quest** | Dungeon + monster theme per topic area |
+| **Kahoot!** | Quiz-as-game concept, competitive classroom feel |
+
+---
+
+### 📖 Technical References & Documentation
+
+| Resource | Used For |
+|---|---|
+| [FastAPI Official Docs](https://fastapi.tiangolo.com/tutorial/) | API routing, dependency injection, middleware |
+| [Next.js App Router Docs](https://nextjs.org/docs/app) | App Router architecture, client/server components |
+| [Pydantic v2 Migration Guide](https://docs.pydantic.dev/latest/migration/) | Upgrading from Pydantic v1 validators |
+| [Turso HTTP API Reference](https://docs.turso.tech/sdk/http/reference) | Raw SQL over HTTP without SQLAlchemy |
+| [HuggingFace Inference API Docs](https://huggingface.co/docs/api-inference/index) | Model selection, request format, rate limits |
+| [python-jose JWT Docs](https://python-jose.readthedocs.io/en/latest/) | JWT creation and verification |
+| [MDN Web Docs — SVG](https://developer.mozilla.org/en-US/docs/Web/SVG) | Hand-drawing character SVGs and animations |
+| [CSS Tricks — Keyframe Animations](https://css-tricks.com/almanac/properties/a/animation/) | Battle animations: heroIdle, monsterHit, critFlash |
+| [Render Deployment Guide](https://render.com/docs/deploy-fastapi) | FastAPI on Render free tier |
+| [Vercel Next.js Deployment](https://vercel.com/docs/frameworks/nextjs) | Frontend deployment and env vars |
+
+---
+
+## 📚 References & Inspirations
+
+### Academic Research
+
+The gamification mechanics in EduRPG draw from established educational psychology research:
+
+- **Self-Determination Theory** (Deci & Ryan, 1985) — The XP and leveling system supports autonomy (choose your topic), competence (progressively harder monsters), and relatedness (clan system). *Source: Deci, E. L., & Ryan, R. M. (1985). Intrinsic motivation and self-determination in human behavior. Springer.*
+
+- **Flow Theory** (Csikszentmihalyi, 1990) — Monster difficulty scales with player level to maintain the challenge-skill balance that produces "flow" states. *Source: Csikszentmihalyi, M. (1990). Flow: The psychology of optimal experience. Harper & Row.*
+
+- **Spaced Repetition** — Wrong answers trigger an AI explanation immediately, reinforcing the memory at the moment of failure — a core principle of spaced repetition learning. *Source: Ebbinghaus, H. (1885). Über das Gedächtnis. Duncker & Humblot.*
+
+- **Gamification in Education** — The star/XP/badge system is inspired by findings that game elements improve student engagement and retention when they reinforce learning rather than replace it. *Source: Hamari, J., Koivisto, J., & Sarsa, H. (2014). Does gamification work? A literature review. HICSS.*
+
+---
+
+### Open Source Projects That Inspired the Architecture
+
+| Project | What EduRPG Learned |
+|---|---|
+| [full-stack-fastapi-template](https://github.com/fastapi/full-stack-fastapi-template) | JWT auth pattern, project structure |
+| [nextjs-subscription-payments](https://github.com/vercel/nextjs-subscription-payments) | Vercel + API integration patterns |
+| [pokemon-battle-simulator](https://github.com/smogon/pokemon-showdown) | Turn-based battle state machine concept |
+| [awesome-fastapi](https://github.com/mjhea0/awesome-fastapi) | FastAPI best practices compilation |
+
+---
+
+### Learning Resources Used During Development
+
+These resources were directly used while building EduRPG:
+
+- **"Building Data Science Applications with FastAPI"** by François Voron — FastAPI advanced patterns
+- **"Learning TypeScript"** by Josh Goldberg (O'Reilly) — TypeScript type safety patterns
+- **Next.js Learn** course at [nextjs.org/learn](https://nextjs.org/learn) — App Router fundamentals
+- **"Designing Data-Intensive Applications"** by Martin Kleppmann — Database schema design decisions
+- **SQLite Documentation** at [sqlite.org/docs](https://www.sqlite.org/docs.html) — Query optimization for Turso
+- **OWASP Top 10** at [owasp.org](https://owasp.org/www-project-top-ten/) — Security practices: JWT expiry, SQL injection prevention, rate limiting
+
+---
+
+### 🎨 Visual & SVG Resources
+
+All character and monster SVGs in EduRPG are **100% original hand-crafted SVG art** written directly in code — no external art assets, no AI image generation, no stock sprites.
+
+The aesthetic was inspired by:
+
+- **RPG Maker MV** sprite style — chibi proportions, bold outlines
+- **Fire Emblem: Three Houses** — class-based hero design (Samurai, Knight, Wizard)
+- **Undertale** — minimalist pixel-art monster personality design
+
+CSS animation techniques referenced from:
+- [Animista](https://animista.net) — CSS animation presets for reference
+- [Josh Comeau's CSS animations guide](https://www.joshwcomeau.com/animation/css-transitions/) — Easing functions and timing
 
 ---
 
@@ -1445,7 +1495,7 @@ This project is licensed under the MIT License.
 ```
 MIT License
 
-Copyright (c) 2026 EduRPG
+Copyright (c) 2026 EduRPG — Nikhil Nair * Mohit Paradkar * Tanmay Rewale * Prem Rana
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1456,25 +1506,19 @@ furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 ```
-
----
-
-## 🙏 Acknowledgements
-
-- [FastAPI](https://fastapi.tiangolo.com) — Incredible Python web framework
-- [Next.js](https://nextjs.org) — The best React framework
-- [Turso](https://turso.tech) — SQLite for the edge
-- [HuggingFace](https://huggingface.co) — Free AI models
-- [3Blue1Brown](https://www.youtube.com/@3blue1brown) — Amazing math videos
-- [Corey Schafer](https://www.youtube.com/@coreyms) — Best Python tutorials
-- [freeCodeCamp](https://www.youtube.com/@freecodecamp) — Free learning content
 
 ---
 
 <div align="center">
 
-**Built for students who hate boring studying**
+**Built for students who hate boring studying** 🎮📚
+
+*"The best way to learn is to make it impossible to stop playing."*
 
 </div>
 
