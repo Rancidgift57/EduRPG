@@ -228,7 +228,7 @@ export default function ClanPage() {
                 </div>
                 {inClan && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 20 }}>{clan.clan.badge_emoji}</span>
+                        <span style={{ fontSize: 20 }}>{clan?.badge_emoji}</span>
                         <span style={{
                             fontSize: "clamp(10px,2.5vw,13px)", fontWeight: 700,
                             color: clan.badge_color
@@ -487,7 +487,7 @@ export default function ClanPage() {
                                     fontSize: "clamp(40px,10vw,56px)",
                                     filter: `drop-shadow(0 0 16px ${clan.badge_color})`
                                 }}>
-                                    {clan.clan.badge_emoji}
+                                    {clan?.badge_emoji}
                                 </div>
                                 <div>
                                     <div style={{
@@ -920,7 +920,7 @@ function ClanCard({ clan, i, onJoin }: { clan: any; i: number; onJoin?: () => vo
                     fontSize: 32,
                     filter: `drop-shadow(0 0 8px ${clan.badge_color})`
                 }}>
-                    {clan.clan.badge_emoji}
+                    {clan?.badge_emoji}
                 </span>
                 <div>
                     <div style={{
@@ -1131,7 +1131,7 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
                             {myScore}
                         </div>
                         <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
-                            {clan.clan.badge_emoji} {clan.name}
+                            {clan?.badge_emoji} {clan.name}
                         </div>
                     </div>
                     <div style={{
