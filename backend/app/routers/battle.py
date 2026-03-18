@@ -386,3 +386,37 @@ def forfeit_battle(
             "accuracy":        stats.accuracy,
         }
     }
+
+
+# ── Hint (Wizard Skill) ───────────────────────────────────────────────
+
+class HintRequest(BaseModel):
+    session_id:  str
+    question_id: str
+
+@router.post("/hint")
+def get_hint(
+    data: HintRequest,
+    current_user=Depends(get_current_user),
+    conn=Depends(get_db)
+):
+    battle_repo = BattleRepository(conn)
+
+    # Validate session belongs to this user and is still active
+    session = battle_repo.get_session(data.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.user_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not your battle")
+    if session.status != "active":
+        raise HTTPException(status_code=400, detail="Battle already ended")
+
+    # Look up correct index using raw SQL (same pattern as rest of file)
+    result = conn.execute(
+        "SELECT correct_index FROM questions WHERE id = ?",
+        [data.question_id]
+    )
+    if not result.rows:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    return {"correct_index": result.rows[0][0]}
