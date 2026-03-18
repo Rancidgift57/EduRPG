@@ -1,6 +1,6 @@
 # backend/app/routers/clan.py
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import Optional
 
 from ..database import get_db
@@ -39,6 +39,20 @@ class PromoteRequest(BaseModel):
     user_id:  str
     new_role: str   # member / co_leader
 
+    @validator("new_role")
+    def validate_role(cls, v):
+        if v not in ("member", "co_leader"):
+            raise ValueError("new_role must be 'member' or 'co_leader'")
+        return v
+
+# ── Helper — safely read dict or object ──────────────────────────────
+def _get(obj, key, default=None):
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
 # ── Clan Discovery ────────────────────────────────────────────────────
 @router.get("/leaderboard")
 def clan_leaderboard(conn=Depends(get_db)):
@@ -66,12 +80,13 @@ def get_my_clan(
     clan = repo.get_my_clan(current_user["id"])
     if not clan:
         return {"in_clan": False}
-    members = repo.get_members(clan["id"])
-    war     = repo.get_active_war(clan["id"])
+    clan_id = _get(clan, "id")
+    members = repo.get_members(clan_id)
+    war     = repo.get_active_war(clan_id)
     return {
-        "in_clan": True,
-        "clan":    clan,
-        "members": members,
+        "in_clan":    True,
+        "clan":       clan,
+        "members":    members,
         "active_war": war.__dict__ if war else None,
     }
 
@@ -84,9 +99,8 @@ def create_clan(
 ):
     repo = ClanRepository(conn)
 
-    # Check already in a clan
     existing = repo.get_my_clan(current_user["id"])
-    if existing and existing.get("in_clan"):
+    if existing and _get(existing, "in_clan"):
         raise HTTPException(
             status_code=400,
             detail="Leave your current clan before creating a new one"
@@ -126,11 +140,8 @@ def join_clan(
     repo = ClanRepository(conn)
 
     existing = repo.get_my_clan(current_user["id"])
-    if existing and existing.get("in_clan"):
-        raise HTTPException(
-            status_code=400,
-            detail="Leave your current clan first"
-        )
+    if existing and _get(existing, "in_clan"):
+        raise HTTPException(status_code=400, detail="Leave your current clan first")
 
     success = repo.join_clan(clan_id, current_user["id"])
     if not success:
@@ -139,7 +150,6 @@ def join_clan(
             detail="Cannot join this clan (full or invite-only)"
         )
 
-    # Award clan XP from user's existing XP
     user_r = conn.execute(
         "SELECT xp FROM users WHERE id=?", [current_user["id"]]
     )
@@ -159,13 +169,13 @@ def leave_clan(
     if not my_clan:
         raise HTTPException(status_code=400, detail="Not in a clan")
 
-    if my_clan["my_role"] == "leader":
+    if _get(my_clan, "my_role") == "leader":
         raise HTTPException(
             status_code=400,
             detail="Transfer leadership before leaving"
         )
 
-    success = repo.leave_clan(my_clan["id"], current_user["id"])
+    success = repo.leave_clan(_get(my_clan, "id"), current_user["id"])
     if not success:
         raise HTTPException(status_code=400, detail="Could not leave clan")
 
@@ -181,25 +191,82 @@ def get_clan(clan_id: str, conn=Depends(get_db)):
     members = repo.get_members(clan_id)
     return {"clan": clan.__dict__, "members": members}
 
-# ── Promote Member ────────────────────────────────────────────────────
+# ── Promote / Demote Member ───────────────────────────────────────────
 @router.post("/promote")
 def promote_member(
     data: PromoteRequest,
     current_user=Depends(get_current_user),
     conn=Depends(get_db)
 ):
-    repo    = ClanRepository(conn)
+    repo = ClanRepository(conn)
+
+    # ── Get caller's clan + role ──────────────────────────────────────
     my_clan = repo.get_my_clan(current_user["id"])
     if not my_clan:
-        raise HTTPException(status_code=403, detail="Not in a clan")
+        raise HTTPException(status_code=403, detail="You are not in a clan")
 
-    success = repo.promote_member(
-        my_clan["id"], data.user_id, data.new_role, current_user["id"]
+    clan_id = _get(my_clan, "id")
+    my_role = _get(my_clan, "my_role")
+
+    if not clan_id:
+        raise HTTPException(status_code=403, detail="Could not determine your clan")
+
+    if my_role not in ("leader", "co_leader"):
+        raise HTTPException(
+            status_code=403,
+            detail="Only leaders and co-leaders can promote members"
+        )
+
+    # ── Cannot change your own role ───────────────────────────────────
+    if data.user_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot change your own role")
+
+    # ── Only leader can grant co_leader ──────────────────────────────
+    if data.new_role == "co_leader" and my_role != "leader":
+        raise HTTPException(
+            status_code=403,
+            detail="Only the clan leader can promote to Co-Leader"
+        )
+
+    # ── Verify target is in the same clan ────────────────────────────
+    target_result = conn.execute(
+        "SELECT role FROM clan_members WHERE clan_id=? AND user_id=?",
+        [clan_id, data.user_id]
     )
-    if not success:
-        raise HTTPException(status_code=403, detail="No permission to promote")
+    if not target_result.rows:
+        raise HTTPException(
+            status_code=404,
+            detail="That user is not in your clan"
+        )
 
-    return {"message": f"Member promoted to {data.new_role}"}
+    target_current_role = target_result.rows[0][0]
+
+    # ── Cannot demote/change the leader ──────────────────────────────
+    if target_current_role == "leader":
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot change the clan leader's role"
+        )
+
+    # ── Nothing to do if already that role ───────────────────────────
+    if target_current_role == data.new_role:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Member is already a {data.new_role}"
+        )
+
+    # ── Apply promotion / demotion ────────────────────────────────────
+    conn.execute(
+        "UPDATE clan_members SET role=? WHERE clan_id=? AND user_id=?",
+        [data.new_role, clan_id, data.user_id]
+    )
+
+    action = "promoted to Co-Leader" if data.new_role == "co_leader" else "demoted to Member"
+    return {
+        "message":  f"Member successfully {action}",
+        "user_id":  data.user_id,
+        "new_role": data.new_role,
+    }
 
 # ── Study Room Messages ───────────────────────────────────────────────
 @router.get("/room/messages")
@@ -212,8 +279,8 @@ def get_messages(
     if not my_clan:
         raise HTTPException(status_code=403, detail="Join a clan first")
 
-    messages = repo.get_messages(my_clan["id"], limit=100)
-    return {"messages": messages, "clan_id": my_clan["id"]}
+    messages = repo.get_messages(_get(my_clan, "id"), limit=100)
+    return {"messages": messages, "clan_id": _get(my_clan, "id")}
 
 @router.post("/room/post")
 def post_message(
@@ -231,12 +298,12 @@ def post_message(
     if len(data.body) > 1000:
         raise HTTPException(status_code=400, detail="Message too long (max 1000 chars)")
 
-    valid_types = {"text","question","resource","announcement"}
+    valid_types = {"text", "question", "resource", "announcement"}
     if data.msg_type not in valid_types:
         data.msg_type = "text"
 
     msg = repo.post_message(
-        my_clan["id"], current_user["id"],
+        _get(my_clan, "id"), current_user["id"],
         data.body.strip(), data.msg_type
     )
     return msg
@@ -253,24 +320,20 @@ def declare_war(
 
     if not my_clan:
         raise HTTPException(status_code=403, detail="Not in a clan")
-    if my_clan["my_role"] not in ("leader", "co_leader"):
+    if _get(my_clan, "my_role") not in ("leader", "co_leader"):
         raise HTTPException(status_code=403, detail="Only leaders can declare war")
 
-    # Check not already at war
-    existing_war = repo.get_active_war(my_clan["id"])
+    existing_war = repo.get_active_war(_get(my_clan, "id"))
     if existing_war:
-        raise HTTPException(
-            status_code=400,
-            detail="Your clan is already in a war"
-        )
+        raise HTTPException(status_code=400, detail="Your clan is already in a war")
 
-    if data.target_clan_id == my_clan["id"]:
+    if data.target_clan_id == _get(my_clan, "id"):
         raise HTTPException(
             status_code=400,
             detail="Cannot declare war against your own clan"
         )
 
-    war = repo.declare_war(my_clan["id"], data.target_clan_id, data.topic)
+    war = repo.declare_war(_get(my_clan, "id"), data.target_clan_id, data.topic)
     return {
         "message": "War declared! 24-hour preparation phase begins.",
         "war":     war.__dict__,
@@ -300,7 +363,7 @@ def assign_matchup(
 
     if not my_clan:
         raise HTTPException(status_code=403, detail="Not in a clan")
-    if my_clan["my_role"] not in ("leader","co_leader"):
+    if _get(my_clan, "my_role") not in ("leader", "co_leader"):
         raise HTTPException(status_code=403, detail="Only leaders can assign matchups")
 
     matchup = repo.assign_matchup(
@@ -330,18 +393,20 @@ def my_active_war(
     if not my_clan:
         return {"has_war": False}
 
-    war = repo.get_active_war(my_clan["id"])
+    war = repo.get_active_war(_get(my_clan, "id"))
     if not war:
         return {"has_war": False}
 
     matchups    = repo.get_war_matchups(war.id)
-    my_matchups = [m for m in matchups
-                   if m["attacker_id"] == current_user["id"]
-                   or m["defender_id"] == current_user["id"]]
+    my_matchups = [
+        m for m in matchups
+        if m.get("attacker_id") == current_user["id"]
+        or m.get("defender_id") == current_user["id"]
+    ]
 
     return {
-        "has_war":    True,
-        "war":        war.__dict__,
-        "matchups":   matchups,
+        "has_war":     True,
+        "war":         war.__dict__,
+        "matchups":    matchups,
         "my_matchups": my_matchups,
     }
