@@ -69,11 +69,11 @@ def get_my_clan(
     members = repo.get_members(clan["id"])
     war     = repo.get_active_war(clan["id"])
     return {
+        "id": "...",
+        "name": "...",
         "in_clan": True,
-        "clan":    clan,
-        "members": members,
-        "active_war": war.__dict__ if war else None,
-    }
+        "my_role": "member"
+}
 
 # ── Create Clan ───────────────────────────────────────────────────────
 @router.post("/create")
