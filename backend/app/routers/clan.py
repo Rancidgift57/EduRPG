@@ -156,7 +156,7 @@ def leave_clan(
 ):
     repo    = ClanRepository(conn)
     my_clan = repo.get_my_clan(current_user["id"])
-    if not my_clan or not my_clan.get("in_clan"):
+    if not my_clan:
         raise HTTPException(status_code=400, detail="Not in a clan")
 
     if my_clan["my_role"] == "leader":
@@ -190,7 +190,7 @@ def promote_member(
 ):
     repo    = ClanRepository(conn)
     my_clan = repo.get_my_clan(current_user["id"])
-    if not my_clan or not my_clan.get("in_clan"):
+    if not my_clan:
         raise HTTPException(status_code=403, detail="Not in a clan")
 
     success = repo.promote_member(
@@ -209,7 +209,7 @@ def get_messages(
 ):
     repo    = ClanRepository(conn)
     my_clan = repo.get_my_clan(current_user["id"])
-    if not my_clan or not my_clan.get("in_clan"):
+    if not my_clan:
         raise HTTPException(status_code=403, detail="Join a clan first")
 
     messages = repo.get_messages(my_clan["id"], limit=100)
@@ -223,7 +223,7 @@ def post_message(
 ):
     repo    = ClanRepository(conn)
     my_clan = repo.get_my_clan(current_user["id"])
-    if not my_clan or not my_clan.get("in_clan"):
+    if not my_clan:
         raise HTTPException(status_code=403, detail="Join a clan first")
 
     if not data.body.strip():
@@ -251,7 +251,7 @@ def declare_war(
     repo    = ClanRepository(conn)
     my_clan = repo.get_my_clan(current_user["id"])
 
-    if not my_clan or not my_clan.get("in_clan"):
+    if not my_clan:
         raise HTTPException(status_code=403, detail="Not in a clan")
     if my_clan["my_role"] not in ("leader", "co_leader"):
         raise HTTPException(status_code=403, detail="Only leaders can declare war")
@@ -298,7 +298,7 @@ def assign_matchup(
     repo    = ClanRepository(conn)
     my_clan = repo.get_my_clan(current_user["id"])
 
-    if not my_clan or not my_clan.get("in_clan"):
+    if not my_clan:
         raise HTTPException(status_code=403, detail="Not in a clan")
     if my_clan["my_role"] not in ("leader","co_leader"):
         raise HTTPException(status_code=403, detail="Only leaders can assign matchups")
@@ -327,7 +327,7 @@ def my_active_war(
 ):
     repo    = ClanRepository(conn)
     my_clan = repo.get_my_clan(current_user["id"])
-    if not my_clan or not my_clan.get("in_clan"):
+    if not my_clan:
         return {"has_war": False}
 
     war = repo.get_active_war(my_clan["id"])
