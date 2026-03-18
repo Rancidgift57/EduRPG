@@ -1,4 +1,4 @@
-"use client";
+="use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -38,8 +38,8 @@ export default function MultiplayerAttackPage() {
     const currentQIdxRef = useRef(0);
     const myQsRef = useRef<any[]>([]);
     const answersRef = useRef<Record<string, number>>({});
-    const totalTimeRef = useRef(0);   // total seconds used across all questions
-    const qStartTimeRef = useRef(30);  // seconds remaining when question started
+    const totalTimeRef = useRef(0);
+    const qStartTimeRef = useRef(30);
 
     // Keep refs in sync with state
     useEffect(() => { currentQIdxRef.current = currentQIdx; }, [currentQIdx]);
@@ -288,18 +288,13 @@ export default function MultiplayerAttackPage() {
                     </div>
                 </div>
 
-                <div style={{
-                    display: "flex", flexDirection: "column",
-                    gap: 10, marginBottom: 20
-                }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
                     {questions.map((q, i) => {
                         const sel = picked.includes(q.id);
                         return (
                             <button key={q.id} onClick={() => togglePick(q.id)} style={{
-                                background: sel
-                                    ? "rgba(239,68,68,0.14)" : "rgba(255,255,255,.02)",
-                                border: `1px solid ${sel
-                                    ? "rgba(239,68,68,.5)" : "rgba(255,255,255,.06)"}`,
+                                background: sel ? "rgba(239,68,68,0.14)" : "rgba(255,255,255,.02)",
+                                border: `1px solid ${sel ? "rgba(239,68,68,.5)" : "rgba(255,255,255,.06)"}`,
                                 borderRadius: 12, padding: "14px 16px",
                                 color: "#e2e8f0", cursor: "pointer",
                                 textAlign: "left", fontSize: 13,
@@ -307,19 +302,12 @@ export default function MultiplayerAttackPage() {
                                 transition: "all .2s",
                                 transform: sel ? "scale(1.01)" : "scale(1)",
                             }}>
-                                <div style={{
-                                    display: "flex",
-                                    alignItems: "flex-start", gap: 10
-                                }}>
+                                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                                     <div style={{
-                                        width: 24, height: 24, borderRadius: "50%",
-                                        flexShrink: 0,
-                                        background: sel
-                                            ? "#ef4444" : "rgba(255,255,255,.05)",
-                                        border: `1px solid ${sel
-                                            ? "#ef4444" : "rgba(255,255,255,.1)"}`,
-                                        display: "flex", alignItems: "center",
-                                        justifyContent: "center",
+                                        width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                                        background: sel ? "#ef4444" : "rgba(255,255,255,.05)",
+                                        border: `1px solid ${sel ? "#ef4444" : "rgba(255,255,255,.1)"}`,
+                                        display: "flex", alignItems: "center", justifyContent: "center",
                                         fontSize: 11, fontWeight: 700,
                                         color: sel ? "#fff" : "#6b7280",
                                     }}>
@@ -335,28 +323,19 @@ export default function MultiplayerAttackPage() {
                 <div style={{ textAlign: "center" }}>
                     <div style={{ color: "#6b7280", fontSize: 13, marginBottom: 12 }}>
                         {picked.length}/5 selected
-                        {picked.length < 3 && (
-                            <span style={{ color: "#ef4444" }}> (min 3)</span>
-                        )}
+                        {picked.length < 3 && <span style={{ color: "#ef4444" }}> (min 3)</span>}
                     </div>
                     <button
                         onClick={confirmPick}
                         disabled={picked.length < 3 || loading}
                         style={{
-                            backgroundImage: picked.length >= 3
-                                ? "linear-gradient(135deg,#dc2626,#991b1b)"
-                                : "none",
-                            background: picked.length < 3
-                                ? "rgba(255,255,255,.05)" : undefined,
-                            border: "none", borderRadius: 12,
-                            padding: "14px 40px", color: "#fff",
-                            fontFamily: "Cinzel", fontSize: 15,
-                            fontWeight: 700, cursor: picked.length >= 3
-                                ? "pointer" : "not-allowed",
-                            opacity: picked.length >= 3 ? 1 : .5,
-                            letterSpacing: ".1em",
-                            boxShadow: picked.length >= 3
-                                ? "0 0 20px rgba(220,38,38,.4)" : "none",
+                            backgroundImage: picked.length >= 3 ? "linear-gradient(135deg,#dc2626,#991b1b)" : "none",
+                            background: picked.length < 3 ? "rgba(255,255,255,.05)" : undefined,
+                            border: "none", borderRadius: 12, padding: "14px 40px", color: "#fff",
+                            fontFamily: "Cinzel", fontSize: 15, fontWeight: 700,
+                            cursor: picked.length >= 3 ? "pointer" : "not-allowed",
+                            opacity: picked.length >= 3 ? 1 : .5, letterSpacing: ".1em",
+                            boxShadow: picked.length >= 3 ? "0 0 20px rgba(220,38,38,.4)" : "none",
                         }}>
                         💀 LAUNCH ATTACK →
                     </button>
@@ -369,40 +348,22 @@ export default function MultiplayerAttackPage() {
     if (step === "answer") return (
         <Screen>
             {/* Overlays */}
-            {showQExpired && (
-                <TimeoutOverlay
-                    type="question"
-                    onClose={() => setShowQExpired(false)}
-                />
-            )}
-            {showBExpired && (
-                <TimeoutOverlay
-                    type="battle"
-                    onClose={() => setShowBExpired(false)}
-                />
-            )}
+            {showQExpired && <TimeoutOverlay type="question" onClose={() => setShowQExpired(false)} />}
+            {showBExpired && <TimeoutOverlay type="battle" onClose={() => setShowBExpired(false)} />}
 
             <div style={{ maxWidth: 700, margin: "0 auto" }}>
 
-                {/* Header row with battle clock */}
+                {/* Header row */}
                 <div style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 20,
-                    flexWrap: "wrap",
-                    gap: 12,
+                    display: "flex", justifyContent: "space-between",
+                    alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12,
                 }}>
                     <div>
-                        <div style={{
-                            fontSize: 10, color: "#22c55e",
-                            letterSpacing: ".2em", fontWeight: 700
-                        }}>
+                        <div style={{ fontSize: 10, color: "#22c55e", letterSpacing: ".2em", fontWeight: 700 }}>
                             STEP 2 OF 2 — MULTIPLAYER
                         </div>
                         <h2 style={{
-                            fontFamily: "Cinzel",
-                            fontSize: "clamp(16px,4vw,20px)",
+                            fontFamily: "Cinzel", fontSize: "clamp(16px,4vw,20px)",
                             color: "#e9d5ff", margin: "4px 0 2px"
                         }}>
                             Answer Your Questions
@@ -411,72 +372,43 @@ export default function MultiplayerAttackPage() {
                             Question {currentQIdx + 1} of {myQs.length}
                         </div>
                     </div>
-
-                    {/* BATTLE CLOCK */}
                     <BattleClock timeLeft={battleTimeLeft} isPaused={isPaused} />
                 </div>
 
                 {/* Progress dots */}
-                <div style={{
-                    display: "flex",
-                    gap: 6,
-                    marginBottom: 20,
-                    justifyContent: "center",
-                    flexWrap: "wrap",
-                }}>
+                <div style={{ display: "flex", gap: 6, marginBottom: 20, justifyContent: "center", flexWrap: "wrap" }}>
                     {myQs.map((q, i) => {
                         const isDone = q.id in answers;
                         const isTimeout = answers[q.id] === -1;
                         const isCurrent = i === currentQIdx;
                         return (
                             <div key={q.id} style={{
-                                width: isCurrent ? 26 : 10,
-                                height: 10,
-                                borderRadius: 5,
+                                width: isCurrent ? 26 : 10, height: 10, borderRadius: 5,
                                 background: isDone
                                     ? isTimeout ? "#ef4444" : "#22c55e"
-                                    : isCurrent ? "#a855f7"
-                                        : "rgba(255,255,255,.1)",
+                                    : isCurrent ? "#a855f7" : "rgba(255,255,255,.1)",
                                 transition: "all .3s",
-                                boxShadow: isCurrent
-                                    ? "0 0 8px rgba(168,85,247,.6)" : "none",
+                                boxShadow: isCurrent ? "0 0 8px rgba(168,85,247,.6)" : "none",
                             }} />
                         );
                     })}
                 </div>
 
-                {/* Current question */}
+                {/* ── Current question card ── */}
                 {currentQ && !allAnswered && (
                     <div style={{
                         background: "rgba(0,0,0,.5)",
                         border: "1px solid rgba(168,85,247,.2)",
-                        borderRadius: 16,
-                        padding: 20,
-                        marginBottom: 16,
+                        borderRadius: 16, padding: 20, marginBottom: 16,
                         animation: "mpFadeIn .3s ease-out",
                     }}>
-                        {/* QUESTION TIMER BAR */}
-                        <QuestionTimerBar
-                            timeLeft={questionTimeLeft}
-                            maxTime={30}
-                            isPaused={isPaused}
-                        />
+                        <QuestionTimerBar timeLeft={questionTimeLeft} maxTime={30} isPaused={isPaused} />
 
-                        <p style={{
-                            fontSize: 15,
-                            lineHeight: 1.65,
-                            color: "#e2e8f0",
-                            marginBottom: 16,
-                            fontWeight: 500,
-                        }}>
+                        <p style={{ fontSize: 15, lineHeight: 1.65, color: "#e2e8f0", marginBottom: 16, fontWeight: 500 }}>
                             {currentQ.body}
                         </p>
 
-                        <div style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            gap: 9,
-                        }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
                             {currentQ.options?.map((opt: string, i: number) => (
                                 <button
                                     key={i}
@@ -488,14 +420,11 @@ export default function MultiplayerAttackPage() {
                                         borderRadius: 12,
                                         padding: "clamp(11px,3vw,14px) 14px",
                                         color: "#d1d5db",
-                                        cursor: answeredRef.current
-                                            ? "not-allowed" : "pointer",
+                                        cursor: answeredRef.current ? "not-allowed" : "pointer",
                                         textAlign: "left",
                                         fontSize: "clamp(12px,3vw,14px)",
-                                        fontFamily: "Rajdhani",
-                                        fontWeight: 600,
-                                        transition: "all .2s",
-                                        minHeight: 48,
+                                        fontFamily: "Rajdhani", fontWeight: 600,
+                                        transition: "all .2s", minHeight: 48,
                                     }}
                                     onMouseEnter={e => {
                                         if (!answeredRef.current) {
@@ -513,11 +442,8 @@ export default function MultiplayerAttackPage() {
                                     }}
                                 >
                                     <span style={{
-                                        color: "#6b7280",
-                                        fontWeight: 800,
-                                        marginRight: 7,
-                                        fontFamily: "Cinzel",
-                                        fontSize: "clamp(10px,2.5vw,12px)",
+                                        color: "#6b7280", fontWeight: 800, marginRight: 7,
+                                        fontFamily: "Cinzel", fontSize: "clamp(10px,2.5vw,12px)",
                                     }}>
                                         {["A", "B", "C", "D"][i]}
                                     </span>
@@ -528,10 +454,8 @@ export default function MultiplayerAttackPage() {
 
                         {isPaused && (
                             <div style={{
-                                textAlign: "center",
-                                marginTop: 10,
-                                fontSize: 11,
-                                color: "#9ca3af",
+                                textAlign: "center", marginTop: 10,
+                                fontSize: 11, color: "#9ca3af",
                                 animation: "mpPulse 1s ease infinite",
                             }}>
                                 ⏳ Processing...
@@ -540,35 +464,153 @@ export default function MultiplayerAttackPage() {
                     </div>
                 )}
 
-                {/* All answered — manual submit button */}
+                {/* ── All answered — rich summary + submit card ── */}
                 {allAnswered && !loading && (
-                    <div style={{ textAlign: "center", animation: "mpFadeIn .3s ease-out" }}>
+                    <div style={{ animation: "bounceIn .5s ease-out" }}>
                         <div style={{
-                            color: "#22c55e", fontSize: 13,
-                            fontWeight: 700, marginBottom: 16
+                            background: "rgba(0,0,0,.55)",
+                            border: "1px solid rgba(168,85,247,.25)",
+                            borderRadius: 20, padding: "32px 24px",
+                            boxShadow: "0 0 60px rgba(124,58,237,.15), inset 0 0 40px rgba(124,58,237,.04)",
+                            textAlign: "center",
                         }}>
-                            ✅ All questions answered!
-                        </div>
-                        <button
-                            onClick={() => doSubmitToBackend()}
-                            style={{
-                                backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d)",
-                                border: "none",
-                                borderRadius: 12,
-                                padding: "14px 48px",
-                                color: "#fff",
-                                fontFamily: "Cinzel",
-                                fontSize: 15,
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                letterSpacing: ".1em",
-                                boxShadow: "0 0 24px rgba(124,58,237,.5)",
+                            {/* Floating sword */}
+                            <div style={{
+                                fontSize: 56, marginBottom: 14,
+                                animation: "heroIdle 2.5s ease-in-out infinite",
+                                display: "inline-block",
+                                filter: "drop-shadow(0 0 20px rgba(251,191,36,.8))",
+                            }}>⚔️</div>
+
+                            {/* Title */}
+                            <div style={{
+                                fontFamily: "Cinzel", fontSize: 26, fontWeight: 900,
+                                color: "#e9d5ff", marginBottom: 6, letterSpacing: ".08em",
+                                animation: "vsFlash 2s ease infinite",
                             }}>
-                            ⚔️ SUBMIT ATTACK
-                        </button>
-                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 8 }}>
-                            Time used: {totalTimeRef.current}s
+                                ATTACK READY!
+                            </div>
+                            <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 28 }}>
+                                All {myQs.length} questions answered
+                            </div>
+
+                            {/* Per-question result bubbles */}
+                            <div style={{
+                                display: "flex", justifyContent: "center",
+                                gap: 12, marginBottom: 28, flexWrap: "wrap",
+                            }}>
+                                {myQs.map((q, i) => {
+                                    const isTimeout = answers[q.id] === -1;
+                                    return (
+                                        <div key={q.id} style={{
+                                            display: "flex", flexDirection: "column",
+                                            alignItems: "center", gap: 5,
+                                        }}>
+                                            <div style={{
+                                                width: 42, height: 42, borderRadius: "50%",
+                                                background: isTimeout
+                                                    ? "rgba(239,68,68,.18)" : "rgba(34,197,94,.18)",
+                                                border: `2px solid ${isTimeout ? "#ef4444" : "#22c55e"}`,
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                fontSize: 18,
+                                                boxShadow: isTimeout
+                                                    ? "0 0 14px rgba(239,68,68,.4)"
+                                                    : "0 0 14px rgba(34,197,94,.4)",
+                                                animation: `bounceIn .4s ease-out ${i * 0.09}s both`,
+                                            }}>
+                                                {isTimeout ? "⏱" : "✓"}
+                                            </div>
+                                            <span style={{
+                                                fontSize: 10, color: "#4b5563",
+                                                fontFamily: "Cinzel", fontWeight: 700,
+                                            }}>Q{i + 1}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Stats row */}
+                            <div style={{
+                                display: "flex", justifyContent: "center",
+                                gap: 36, marginBottom: 28, flexWrap: "wrap",
+                            }}>
+                                {[
+                                    {
+                                        label: "ANSWERED",
+                                        value: `${myQs.filter(q => answers[q.id] !== -1).length}/${myQs.length}`,
+                                        color: "#22c55e",
+                                    },
+                                    {
+                                        label: "TIMED OUT",
+                                        value: `${myQs.filter(q => answers[q.id] === -1).length}`,
+                                        color: "#ef4444",
+                                    },
+                                    {
+                                        label: "TIME USED",
+                                        value: `${totalTimeRef.current}s`,
+                                        color: "#fbbf24",
+                                    },
+                                ].map(({ label, value, color }) => (
+                                    <div key={label} style={{ textAlign: "center" }}>
+                                        <div style={{
+                                            fontFamily: "Cinzel", fontSize: 28, fontWeight: 900,
+                                            color, textShadow: `0 0 14px ${color}99`,
+                                        }}>{value}</div>
+                                        <div style={{
+                                            fontSize: 9, color: "#4b5563",
+                                            letterSpacing: ".15em", fontWeight: 700, marginTop: 3,
+                                        }}>{label}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Glowing divider */}
+                            <div style={{
+                                height: 1, marginBottom: 26,
+                                backgroundImage: "linear-gradient(90deg,transparent,rgba(168,85,247,.5),rgba(239,68,68,.5),rgba(168,85,247,.5),transparent)",
+                            }} />
+
+                            {/* Submit button */}
+                            <button
+                                onClick={() => doSubmitToBackend()}
+                                style={{
+                                    backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d)",
+                                    border: "none", borderRadius: 14,
+                                    padding: "17px 0", color: "#fff",
+                                    fontFamily: "Cinzel", fontSize: 17, fontWeight: 700,
+                                    cursor: "pointer", letterSpacing: ".12em",
+                                    boxShadow: "0 0 32px rgba(124,58,237,.6), 0 0 60px rgba(190,24,93,.25)",
+                                    animation: "victoryPulse 2s ease infinite",
+                                    width: "100%", maxWidth: 380,
+                                    display: "block", margin: "0 auto",
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.transform = "scale(1.03)";
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.transform = "scale(1)";
+                                }}
+                            >
+                                ⚔️ LAUNCH ATTACK
+                            </button>
                         </div>
+                    </div>
+                )}
+
+                {/* Submitting loader */}
+                {loading && (
+                    <div style={{ textAlign: "center", padding: "32px 0" }}>
+                        <div style={{
+                            fontSize: 44, display: "inline-block",
+                            animation: "mpSpin 0.9s linear infinite",
+                            filter: "drop-shadow(0 0 18px rgba(168,85,247,.9))",
+                        }}>⚔️</div>
+                        <p style={{
+                            color: "#a855f7", marginTop: 12,
+                            fontFamily: "Cinzel", letterSpacing: ".15em", fontSize: 13,
+                        }}>
+                            SENDING ATTACK...
+                        </p>
                     </div>
                 )}
             </div>
@@ -578,47 +620,110 @@ export default function MultiplayerAttackPage() {
     // ── Waiting for opponent ──────────────────────────────────────────
     if (step === "waiting") return (
         <Screen>
-            <div style={{ textAlign: "center", maxWidth: 400, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", maxWidth: 460, margin: "0 auto" }}>
+
+                {/* Spinning hourglass */}
                 <div style={{
-                    fontSize: 64, marginBottom: 16,
-                    animation: "mpSpin 3s linear infinite"
+                    fontSize: 72, marginBottom: 20, display: "inline-block",
+                    animation: "mpSpin 3s linear infinite",
+                    filter: "drop-shadow(0 0 24px rgba(168,85,247,.7))",
                 }}>⏳</div>
+
                 <h2 style={{
-                    fontFamily: "Cinzel", fontSize: 22,
-                    color: "#c084fc", marginBottom: 8
-                }}>ATTACK SENT!</h2>
-                <p style={{ color: "#9ca3af", fontSize: 14, marginBottom: 4 }}>
-                    Your score:{" "}
-                    <span style={{
-                        color: "#22c55e", fontWeight: 700,
-                        fontFamily: "Cinzel"
+                    fontFamily: "Cinzel", fontSize: 28,
+                    color: "#c084fc", marginBottom: 6,
+                    animation: "vsFlash 2s ease infinite",
+                }}>
+                    ATTACK SENT!
+                </h2>
+                <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 24 }}>
+                    Waiting for opponent to respond...
+                </p>
+
+                {/* Score + stats card */}
+                <div style={{
+                    background: "rgba(0,0,0,.5)",
+                    border: "1px solid rgba(168,85,247,.2)",
+                    borderRadius: 18, padding: "28px 28px 24px",
+                    marginBottom: 20,
+                    boxShadow: "0 0 40px rgba(124,58,237,.12)",
+                }}>
+                    <div style={{ marginBottom: 20 }}>
+                        <div style={{
+                            fontFamily: "Cinzel", fontSize: 52, fontWeight: 900,
+                            color: "#22c55e",
+                            textShadow: "0 0 28px rgba(34,197,94,.7)",
+                            animation: "bounceIn .6s ease-out",
+                            lineHeight: 1,
+                        }}>
+                            {score}/{myQs.length}
+                        </div>
+                        <div style={{
+                            fontSize: 10, color: "#4b5563",
+                            letterSpacing: ".2em", fontWeight: 700, marginTop: 6,
+                        }}>
+                            YOUR SCORE
+                        </div>
+                    </div>
+
+                    <div style={{
+                        height: 1, marginBottom: 20,
+                        backgroundImage: "linear-gradient(90deg,transparent,rgba(168,85,247,.3),transparent)",
+                    }} />
+
+                    <div style={{
+                        display: "flex", justifyContent: "space-around",
+                        gap: 12, flexWrap: "wrap",
                     }}>
-                        {score}/{myQs.length}
-                    </span>
-                </p>
-                <p style={{ color: "#6b7280", fontSize: 12, marginBottom: 4 }}>
-                    Opponent gets{" "}
-                    <strong style={{ color: "#fbbf24" }}>30s per question</strong>
-                    {" "}·{" "}
-                    <strong style={{ color: "#fbbf24" }}>3 min total</strong>
-                    {" "}to defend.
-                </p>
-                <p style={{ color: "#4b5563", fontSize: 11 }}>
-                    Your total time: {totalTimeRef.current}s
-                </p>
+                        {[
+                            { label: "YOUR TIME", value: `${totalTimeRef.current}s`, color: "#fbbf24" },
+                            { label: "OPP. LIMIT", value: "3 min", color: "#f87171" },
+                            { label: "PER Q", value: "30s", color: "#60a5fa" },
+                        ].map(({ label, value, color }) => (
+                            <div key={label} style={{ textAlign: "center" }}>
+                                <div style={{
+                                    fontFamily: "Cinzel", fontSize: 20, fontWeight: 700,
+                                    color, textShadow: `0 0 10px ${color}88`,
+                                }}>{value}</div>
+                                <div style={{
+                                    fontSize: 9, color: "#374151",
+                                    letterSpacing: ".12em", fontWeight: 700, marginTop: 3,
+                                }}>{label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Warning badge */}
+                <div style={{
+                    background: "rgba(251,191,36,.06)",
+                    border: "1px solid rgba(251,191,36,.2)",
+                    borderRadius: 12, padding: "12px 18px",
+                    fontSize: 12, color: "#fbbf24", marginBottom: 24,
+                    animation: "glowPulse 2s ease infinite",
+                }}>
+                    ⚠️ Opponent gets <strong>30s per question</strong> · <strong>3 min total</strong> to defend
+                </div>
+
                 <button
                     onClick={() => router.push("/multiplayer")}
                     style={{
-                        marginTop: 24,
-                        background: "rgba(124,58,237,.3)",
+                        background: "rgba(124,58,237,.25)",
                         border: "1px solid rgba(168,85,247,.3)",
-                        borderRadius: 12,
-                        padding: "12px 32px",
-                        color: "#c084fc",
-                        cursor: "pointer",
-                        fontFamily: "Cinzel",
-                        fontSize: 13,
-                    }}>
+                        borderRadius: 12, padding: "13px 36px",
+                        color: "#c084fc", cursor: "pointer",
+                        fontFamily: "Cinzel", fontSize: 13, fontWeight: 700,
+                        letterSpacing: ".1em", transition: "all .2s",
+                    }}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.background = "rgba(124,58,237,.4)";
+                        e.currentTarget.style.boxShadow = "0 0 20px rgba(168,85,247,.3)";
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.background = "rgba(124,58,237,.25)";
+                        e.currentTarget.style.boxShadow = "none";
+                    }}
+                >
                     🏠 BACK TO HUB
                 </button>
             </div>
@@ -628,7 +733,9 @@ export default function MultiplayerAttackPage() {
     return null;
 }
 
-// ── Shared layout helpers ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────
+// SCREEN — all keyframes centralised here so EVERY step has animations
+// ─────────────────────────────────────────────────────────────────────
 
 function Screen({ children }: { children: React.ReactNode }) {
     return (
@@ -672,7 +779,7 @@ function Screen({ children }: { children: React.ReactNode }) {
                 @keyframes heroHit {
                     0%, 100% { transform: translateX(0); filter: brightness(1); }
                     25%      { transform: translateX(-12px); filter: brightness(2) saturate(0); }
-                    75%      { transform: translateX(6px); filter: brightness(1.5); }
+                    75%      { transform: translateX(6px);  filter: brightness(1.5); }
                 }
 
                 /* ── Monster animations ── */
@@ -687,20 +794,20 @@ function Screen({ children }: { children: React.ReactNode }) {
                     100% { transform: scaleX(-1) translateX(0) scale(1); }
                 }
                 @keyframes monsterHit {
-                    0%, 100% { transform: scaleX(-1) translateX(0); filter: brightness(1); }
+                    0%, 100% { transform: scaleX(-1) translateX(0);   filter: brightness(1); }
                     25%      { transform: scaleX(-1) translateX(12px); filter: brightness(2) saturate(0); }
                     75%      { transform: scaleX(-1) translateX(-6px); filter: brightness(1.5); }
                 }
                 @keyframes deathAnim {
-                    0%   { opacity: 1; transform: scaleX(-1) scale(1) translateY(0); filter: brightness(1); }
+                    0%   { opacity: 1;   transform: scaleX(-1) scale(1)   translateY(0);     filter: brightness(1); }
                     40%  { opacity: 0.7; transform: scaleX(-1) scale(1.1) translateY(-10px); filter: brightness(3) saturate(0); }
-                    100% { opacity: 0; transform: scaleX(-1) scale(0.3) translateY(30px) rotate(20deg); filter: brightness(0); }
+                    100% { opacity: 0;   transform: scaleX(-1) scale(0.3) translateY(30px) rotate(20deg); filter: brightness(0); }
                 }
 
                 /* ── UI effects ── */
                 @keyframes shimmer {
                     0%   { background-position: -200% center; }
-                    100% { background-position: 200% center; }
+                    100% { background-position:  200% center; }
                 }
                 @keyframes spin {
                     from { transform: rotate(0deg); }
@@ -739,8 +846,8 @@ function Screen({ children }: { children: React.ReactNode }) {
                     to   { opacity: 1; transform: translateY(0); }
                 }
                 @keyframes victoryPulse {
-                    0%, 100% { box-shadow: 0 0 100px rgba(251,191,36,0.4); }
-                    50%      { box-shadow: 0 0 140px rgba(251,191,36,0.75); }
+                    0%, 100% { box-shadow: 0 0 32px rgba(124,58,237,.6), 0 0 60px rgba(190,24,93,.25); }
+                    50%      { box-shadow: 0 0 52px rgba(124,58,237,.9), 0 0 90px rgba(190,24,93,.5); }
                 }
                 @keyframes defeatPulse {
                     0%, 100% { box-shadow: 0 0 100px rgba(239,68,68,0.4); }
@@ -768,15 +875,9 @@ function BackBtn({ onClick }: { onClick: () => void }) {
         <button
             onClick={onClick}
             style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "#6b7280",
-                fontSize: 13,
-                marginBottom: 20,
-                display: "block",
-                fontFamily: "Rajdhani",
-                fontWeight: 600,
+                background: "none", border: "none", cursor: "pointer",
+                color: "#6b7280", fontSize: 13, marginBottom: 20,
+                display: "block", fontFamily: "Rajdhani", fontWeight: 600,
             }}>
             ← Back
         </button>
