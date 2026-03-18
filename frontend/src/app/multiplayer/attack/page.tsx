@@ -672,6 +672,20 @@ function Screen({ children }: { children: React.ReactNode }) {
             justifyContent: "center",
             paddingTop: "clamp(24px,5vw,48px)",
         }}>
+            <style>{`
+                @keyframes mpFadeIn {
+                    from { opacity: 0; transform: translateY(14px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes mpPulse {
+                    0%, 100% { opacity: .5; }
+                    50%       { opacity: 1; }
+                }
+                @keyframes mpSpin {
+                    from { transform: rotate(0deg); }
+                    to   { transform: rotate(360deg); }
+                }
+            `}</style>
             <div style={{ width: "100%", maxWidth: 740 }}>{children}</div>
         </div>
     );
