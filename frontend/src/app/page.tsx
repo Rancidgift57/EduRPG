@@ -784,7 +784,7 @@ export default function HomePage() {
                 color: "#374151", fontSize: 12, marginTop: 12,
                 letterSpacing: "0.1em", fontWeight: 600
               }}>
-                {selected.name} vs {topic.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase())} Monster · Powered by Gemini AI
+                {selected.name} vs {topic.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase())} Monster
               </p>
             </div>
           )}
