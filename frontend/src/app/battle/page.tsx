@@ -626,6 +626,7 @@ export default function BattlePage() {
     const [activeEffects, setActiveEffects] = useState<Set<string>>(new Set());
     const [effectDurations, setEffectDurations] = useState<Record<string, number>>({});
     const [eliminatedOptions, setEliminatedOptions] = useState<number[]>([]);
+    const [currentCorrectIndex, setCurrentCorrectIndex] = useState<number>(-1);
     const [skillToast, setSkillToast] = useState<string | null>(null);
     const [showForesight, setShowForesight] = useState(false);
     const [showDataScan, setShowDataScan] = useState(false);
@@ -662,7 +663,7 @@ export default function BattlePage() {
     };
 
     // ── USE SKILL ─────────────────────────────────────────────────────
-    const handleUseSkill = () => {
+    const handleUseSkill = async () => {
         if (skillCooldown > 0 || skillActive || !hero) return;
         const skill = HERO_SKILLS[hero.sprite_key];
         if (!skill) return;
@@ -680,18 +681,59 @@ export default function BattlePage() {
                 break;
 
             case "hint_spell": {
-                // Eliminate one wrong answer
-                const wrongIdxs = question?.options
-                    ?.map((_: string, i: number) => i)
-                    ?.filter((i: number) => i !== (lastResult?.correct_index ?? -1) && !eliminatedOptions.includes(i));
-                if (wrongIdxs?.length > 0) {
-                    const toElim = wrongIdxs[Math.floor(Math.random() * wrongIdxs.length)];
-                    setEliminatedOptions(prev => [...prev, toElim]);
-                    showToast("🔮 Hint Spell! One wrong answer eliminated!");
-                } else {
-                    showToast("🔮 No wrong answers left to eliminate!");
-                }
                 setSkillCooldown(cd);
+                setSkillActive(true);
+                try {
+                    // Ask backend which index is correct for this question
+                    const hintRes = await axios.post(
+                        `${API}/battle/hint`,
+                        { session_id: session?.id, question_id: question?.id },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    const correctIdx: number = hintRes.data.correct_index ?? -1;
+
+                    // Store it so answer highlighting works too
+                    if (correctIdx !== -1) setCurrentCorrectIndex(correctIdx);
+
+                    // Build list of wrong indices (not correct, not already eliminated)
+                    const wrongIdxs = question?.options
+                        ?.map((_: string, i: number) => i)
+                        ?.filter((i: number) => i !== correctIdx && !eliminatedOptions.includes(i)) ?? [];
+
+                    if (wrongIdxs.length > 0) {
+                        const toElim: number = wrongIdxs[Math.floor(Math.random() * wrongIdxs.length)];
+                        setEliminatedOptions(prev => [...prev, toElim]);
+                        showToast("🔮 Hint Spell! One wrong answer eliminated!");
+                    } else {
+                        showToast("🔮 No wrong answers left to eliminate!");
+                    }
+                } catch {
+                    // Fallback if no /battle/hint endpoint: use correct_index from last known result
+                    // or eliminate from the last two options (C/D — indices 2,3) as a safe heuristic
+                    const knownCorrect = currentCorrectIndex !== -1
+                        ? currentCorrectIndex
+                        : lastResult?.correct_index ?? -1;
+
+                    const wrongIdxs = question?.options
+                        ?.map((_: string, i: number) => i)
+                        ?.filter((i: number) => i !== knownCorrect && !eliminatedOptions.includes(i)) ?? [];
+
+                    // If we genuinely don't know the correct index, only eliminate from indices 2 or 3
+                    // (never 0 or 1) to reduce chance of eliminating correct answer
+                    const safeWrongIdxs = knownCorrect === -1
+                        ? wrongIdxs.filter((i: number) => i >= 2)
+                        : wrongIdxs;
+
+                    if (safeWrongIdxs.length > 0) {
+                        const toElim: number = safeWrongIdxs[Math.floor(Math.random() * safeWrongIdxs.length)];
+                        setEliminatedOptions(prev => [...prev, toElim]);
+                        showToast("🔮 Hint Spell! One wrong answer eliminated!");
+                    } else {
+                        showToast("🔮 No wrong answers left to eliminate!");
+                    }
+                } finally {
+                    setSkillActive(false);
+                }
                 break;
             }
 
@@ -751,7 +793,10 @@ export default function BattlePage() {
                 break;
         }
 
-        setSkillActive(false);
+        // hint_spell manages its own skillActive state via try/finally
+        if (skill.effect !== "hint_spell") {
+            setSkillActive(false);
+        }
     };
 
     // ── Start battle ──────────────────────────────────────────────────
@@ -831,6 +876,11 @@ export default function BattlePage() {
             setPlayerHP(r.player_hp ?? playerHP);
             setMonsterHP(r.monster_hp ?? monsterHP);
 
+            // Store correct index for hint spell use on this question
+            if (r.correct_index !== undefined && r.correct_index !== -1) {
+                setCurrentCorrectIndex(r.correct_index);
+            }
+
             // Store next question for foresight
             if (r.next_question) setNextQuestion(r.next_question);
 
@@ -897,6 +947,7 @@ export default function BattlePage() {
                 if (r.next_question) setQuestion(r.next_question);
                 setAnswered(false);
                 setLastResult(null);
+                setCurrentCorrectIndex(-1);
                 setLogMsg("⚔️ Next attack! Choose wisely...");
             }, delay);
 
