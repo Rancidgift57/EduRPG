@@ -23,26 +23,25 @@ const ROLE_LABELS: Record<string, string> = {
     leader: "👑 Leader", co_leader: "⭐ Co-Leader", member: "🗡️ Member"
 };
 
-
-
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
   *{box-sizing:border-box}body{background:#030712;color:#fff;font-family:'Rajdhani',sans-serif;margin:0}
   button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-  input,textarea{font-size:16px!important}
+  input,textarea,select{font-size:16px!important}
   @keyframes fadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
   @keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
   @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
   @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   @keyframes borderPulse{0%,100%{border-color:rgba(239,68,68,.2)}50%{border-color:rgba(239,68,68,.7);box-shadow:0 0 20px rgba(239,68,68,.3)}}
-  @keyframes gradShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
   @keyframes bounceIn{0%{transform:scale(.3);opacity:0}50%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+  @keyframes promotePop{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
   .tabs{display:flex;gap:4px;background:rgba(0,0,0,.4);border-radius:13px;padding:4px;border:1px solid rgba(255,255,255,.05);overflow-x:auto}
   .tab{flex:1;min-width:fit-content;padding:clamp(9px,2.5vw,11px) clamp(10px,3vw,16px);border:none;border-radius:10px;font-family:Cinzel,serif;font-size:clamp(10px,2.5vw,12px);font-weight:700;cursor:pointer;transition:all .25s;white-space:nowrap;letter-spacing:.06em}
   .members-grid{display:grid;grid-template-columns:1fr;gap:8px}
   @media(min-width:640px){.members-grid{grid-template-columns:1fr 1fr}}
   @media(min-width:1024px){.members-grid{grid-template-columns:1fr 1fr 1fr}}
   .war-matchups{display:flex;flex-direction:column;gap:10px}
+  .promote-btn:hover{transform:scale(1.06)!important}
 `;
 
 export default function ClanPage() {
@@ -61,6 +60,7 @@ export default function ClanPage() {
     });
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [promotingId, setPromotingId] = useState<string | null>(null); // tracks loading per member
     const chatRef = useRef<HTMLDivElement>(null);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -72,11 +72,10 @@ export default function ClanPage() {
     useEffect(() => {
         if (!token) { router.push("/"); return; }
         loadAll();
-        // Poll messages every 10 seconds when on room tab
         pollRef.current = setInterval(() => {
             if (tab === "room") loadMessages();
         }, 10000);
-        return () => clearInterval(pollRef.current);
+        return () => clearInterval(pollRef.current!);
     }, []);
 
     useEffect(() => {
@@ -86,7 +85,6 @@ export default function ClanPage() {
     }, [tab]);
 
     useEffect(() => {
-        // Auto-scroll chat to bottom
         if (chatRef.current) {
             chatRef.current.scrollTop = chatRef.current.scrollHeight;
         }
@@ -157,12 +155,37 @@ export default function ClanPage() {
         }
     };
 
-    const inClan = clanData?.in_clan;
-    const clan = clanData?.clan;
+    // ── PROMOTE / DEMOTE ─────────────────────────────────────────────
+    const handlePromote = async (memberId: string, currentRole: string) => {
+        const newRole = currentRole === "co_leader" ? "member" : "co_leader";
+        const action = newRole === "co_leader" ? "promote to Co-Leader" : "demote to Member";
+
+        if (!window.confirm(`Are you sure you want to ${action} this member?`)) return;
+
+        setPromotingId(memberId);
+        setError("");
+        try {
+            const r = await axios.post(
+                `${API}/clan/promote`,
+                { user_id: memberId, new_role: newRole },
+                { headers }
+            );
+            setSuccess(r.data.message || `Member ${action}d successfully!`);
+            await loadAll(); // refresh member list
+        } catch (e: any) {
+            setError(e.response?.data?.detail || `Could not ${action}`);
+        } finally {
+            setPromotingId(null);
+        }
+    };
+
+    const inClan  = clanData?.in_clan;
+    const clan    = clanData?.clan;
     const members = clanData?.members || [];
-    const myRole = clan?.my_role || "member";
+    const myRole  = clan?.my_role || "member";
     const isLeader = myRole === "leader" || myRole === "co_leader";
 
+    // ── Loading ───────────────────────────────────────────────────────
     if (loading) return (
         <div style={{
             minHeight: "100vh", background: "#030712",
@@ -183,10 +206,7 @@ export default function ClanPage() {
     );
 
     return (
-        <div style={{
-            minHeight: "100vh", background: "#030712",
-            color: "#fff", fontFamily: "Rajdhani"
-        }}>
+        <div style={{ minHeight: "100vh", background: "#030712", color: "#fff", fontFamily: "Rajdhani" }}>
             <style>{STYLES}</style>
 
             {/* War Disclaimer Banner */}
@@ -226,7 +246,7 @@ export default function ClanPage() {
                 }}>
                     🛡️ CLAN HALL
                 </div>
-                {inClan && (
+                {inClan ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: 20 }}>{clan?.badge_emoji}</span>
                         <span style={{
@@ -234,8 +254,7 @@ export default function ClanPage() {
                             color: clan.badge_color
                         }}>{clan.name}</span>
                     </div>
-                )}
-                {!inClan && <div style={{ width: 80 }} />}
+                ) : <div style={{ width: 80 }} />}
             </nav>
 
             {/* Alert banners */}
@@ -243,7 +262,7 @@ export default function ClanPage() {
                 <div style={{
                     background: "rgba(127,29,29,.4)", borderBottom: "1px solid rgba(239,68,68,.4)",
                     padding: "10px 20px", textAlign: "center", fontSize: 13,
-                    color: "#fca5a5", cursor: "pointer"
+                    color: "#fca5a5", cursor: "pointer", animation: "bounceIn .3s ease-out"
                 }} onClick={() => setError("")}>
                     ⚠️ {error} — tap to dismiss
                 </div>
@@ -252,7 +271,7 @@ export default function ClanPage() {
                 <div style={{
                     background: "rgba(21,128,61,.3)", borderBottom: "1px solid rgba(34,197,94,.4)",
                     padding: "10px 20px", textAlign: "center", fontSize: 13,
-                    color: "#86efac", cursor: "pointer"
+                    color: "#86efac", cursor: "pointer", animation: "bounceIn .3s ease-out"
                 }} onClick={() => setSuccess("")}>
                     ✅ {success}
                 </div>
@@ -263,7 +282,7 @@ export default function ClanPage() {
                 padding: "clamp(16px,4vw,28px) clamp(14px,3vw,20px)"
             }}>
 
-                {/* ── NOT IN CLAN — Show join/create ────────────────────────── */}
+                {/* ── NOT IN CLAN ───────────────────────────────────────── */}
                 {!inClan && (
                     <div style={{ animation: "fadeIn .5s ease-out" }}>
                         <div style={{ textAlign: "center", marginBottom: 32 }}>
@@ -316,20 +335,14 @@ export default function ClanPage() {
                                         border: "none", borderRadius: 12, padding: "12px 20px",
                                         color: "#fff", fontFamily: "Cinzel", fontSize: 12,
                                         fontWeight: 700, cursor: "pointer"
-                                    }}>
-                                        🔍
-                                    </button>
+                                    }}>🔍</button>
                                 </div>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                     {searchResults.map((c, i) => (
-                                        <ClanCard key={c.id} clan={c} i={i}
-                                            onJoin={() => handleJoin(c.id)} />
+                                        <ClanCard key={c.id} clan={c} i={i} onJoin={() => handleJoin(c.id)} />
                                     ))}
                                     {searchResults.length === 0 && (
-                                        <div style={{
-                                            textAlign: "center", padding: 40,
-                                            color: "#374151", fontSize: 14
-                                        }}>
+                                        <div style={{ textAlign: "center", padding: 40, color: "#374151", fontSize: 14 }}>
                                             No clans found. Try a different search or create your own!
                                         </div>
                                     )}
@@ -351,7 +364,6 @@ export default function ClanPage() {
                                 }}>
                                     ➕ CREATE YOUR CLAN
                                 </div>
-
                                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                                     <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>CLAN NAME *</label>
                                     <input value={createForm.name}
@@ -363,7 +375,6 @@ export default function ClanPage() {
                                             padding: "13px 16px", color: "#e2e8f0", fontSize: 14,
                                             fontFamily: "Rajdhani", fontWeight: 500, outline: "none"
                                         }} />
-
                                     <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>DESCRIPTION</label>
                                     <textarea value={createForm.description}
                                         onChange={e => setCreateForm({ ...createForm, description: e.target.value })}
@@ -373,10 +384,8 @@ export default function ClanPage() {
                                             background: "rgba(0,0,0,.5)",
                                             border: "1px solid rgba(255,255,255,.1)", borderRadius: 12,
                                             padding: "13px 16px", color: "#e2e8f0", fontSize: 14,
-                                            fontFamily: "Rajdhani", fontWeight: 500, outline: "none",
-                                            resize: "vertical"
+                                            fontFamily: "Rajdhani", fontWeight: 500, outline: "none", resize: "vertical"
                                         }} />
-
                                     <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>CLAN BADGE EMOJI</label>
                                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                                         {BADGE_EMOJIS.map(e => (
@@ -386,38 +395,30 @@ export default function ClanPage() {
                                                         ? "rgba(168,85,247,.3)" : "rgba(255,255,255,.04)",
                                                     border: `1px solid ${createForm.badge_emoji === e
                                                         ? "rgba(168,85,247,.6)" : "rgba(255,255,255,.06)"}`,
-                                                    borderRadius: 10, padding: "6px 10px", cursor: "pointer",
-                                                    transition: "all .15s"
+                                                    borderRadius: 10, padding: "6px 10px", cursor: "pointer", transition: "all .15s"
                                                 }}>
                                                 {e}
                                             </button>
                                         ))}
                                     </div>
-
                                     <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>CLAN COLOR</label>
                                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                                         {BADGE_COLORS.map(c => (
                                             <button key={c} onClick={() => setCreateForm({ ...createForm, badge_color: c })}
                                                 style={{
-                                                    width: 32, height: 32, borderRadius: "50%",
-                                                    background: c, cursor: "pointer",
-                                                    border: `3px solid ${createForm.badge_color === c
-                                                        ? "#fff" : "transparent"}`,
-                                                    boxShadow: createForm.badge_color === c
-                                                        ? `0 0 10px ${c}` : "none",
+                                                    width: 32, height: 32, borderRadius: "50%", background: c, cursor: "pointer",
+                                                    border: `3px solid ${createForm.badge_color === c ? "#fff" : "transparent"}`,
+                                                    boxShadow: createForm.badge_color === c ? `0 0 10px ${c}` : "none",
                                                     transition: "all .15s"
                                                 }} />
                                         ))}
                                     </div>
-
                                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
                                         <label style={{ fontSize: 11, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>OPEN TO JOIN</label>
                                         <button onClick={() => setCreateForm({ ...createForm, is_open: !createForm.is_open })}
                                             style={{
-                                                background: createForm.is_open
-                                                    ? "rgba(34,197,94,.25)" : "rgba(239,68,68,.2)",
-                                                border: `1px solid ${createForm.is_open
-                                                    ? "rgba(34,197,94,.5)" : "rgba(239,68,68,.4)"}`,
+                                                background: createForm.is_open ? "rgba(34,197,94,.25)" : "rgba(239,68,68,.2)",
+                                                border: `1px solid ${createForm.is_open ? "rgba(34,197,94,.5)" : "rgba(239,68,68,.4)"}`,
                                                 borderRadius: 20, padding: "6px 16px", cursor: "pointer",
                                                 color: createForm.is_open ? "#4ade80" : "#f87171",
                                                 fontSize: 12, fontWeight: 700
@@ -425,7 +426,6 @@ export default function ClanPage() {
                                             {createForm.is_open ? "✅ Open" : "🔒 Invite Only"}
                                         </button>
                                     </div>
-
                                     {/* Preview */}
                                     <div style={{
                                         background: `${createForm.badge_color}12`,
@@ -433,25 +433,16 @@ export default function ClanPage() {
                                         borderRadius: 12, padding: "12px 16px",
                                         display: "flex", alignItems: "center", gap: 12
                                     }}>
-                                        <span style={{
-                                            fontSize: 32,
-                                            filter: `drop-shadow(0 0 8px ${createForm.badge_color})`
-                                        }}>
+                                        <span style={{ fontSize: 32, filter: `drop-shadow(0 0 8px ${createForm.badge_color})` }}>
                                             {createForm.badge_emoji}
                                         </span>
                                         <div>
-                                            <div style={{
-                                                fontFamily: "Cinzel", fontWeight: 700,
-                                                color: createForm.badge_color, fontSize: 16
-                                            }}>
+                                            <div style={{ fontFamily: "Cinzel", fontWeight: 700, color: createForm.badge_color, fontSize: 16 }}>
                                                 {createForm.name || "Clan Name"}
                                             </div>
-                                            <div style={{ fontSize: 11, color: "#6b7280" }}>
-                                                Preview
-                                            </div>
+                                            <div style={{ fontSize: 11, color: "#6b7280" }}>Preview</div>
                                         </div>
                                     </div>
-
                                     <button onClick={handleCreate}
                                         disabled={createForm.name.length < 3}
                                         style={{
@@ -470,7 +461,7 @@ export default function ClanPage() {
                     </div>
                 )}
 
-                {/* ── IN CLAN ───────────────────────────────────────────────── */}
+                {/* ── IN CLAN ───────────────────────────────────────────── */}
                 {inClan && (
                     <div>
                         {/* Clan header */}
@@ -479,8 +470,8 @@ export default function ClanPage() {
                             border: `2px solid ${clan.badge_color}35`,
                             borderRadius: 18, padding: "clamp(16px,4vw,24px)",
                             marginBottom: 20, display: "flex",
-                            justifyContent: "space-between", alignItems: "center", gap: 16,
-                            flexWrap: "wrap"
+                            justifyContent: "space-between", alignItems: "center",
+                            gap: 16, flexWrap: "wrap"
                         }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                                 <div style={{
@@ -498,8 +489,7 @@ export default function ClanPage() {
                                         {clan.name}
                                     </div>
                                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                                        {clan.tag} · Level {clan.level} ·{" "}
-                                        {clan.member_count}/{clan.max_members} members
+                                        {clan.tag} · Level {clan.level} · {clan.member_count}/{clan.max_members} members
                                     </div>
                                     <div style={{
                                         fontSize: 11, marginTop: 4,
@@ -516,10 +506,7 @@ export default function ClanPage() {
                                 }}>
                                     {(clan.total_xp || 0).toLocaleString()} XP
                                 </div>
-                                <div style={{
-                                    fontSize: 10, color: "#6b7280",
-                                    letterSpacing: ".12em", fontWeight: 700
-                                }}>
+                                <div style={{ fontSize: 10, color: "#6b7280", letterSpacing: ".12em", fontWeight: 700 }}>
                                     CLAN XP
                                 </div>
                             </div>
@@ -534,22 +521,17 @@ export default function ClanPage() {
                                 display: "flex", justifyContent: "space-between",
                                 alignItems: "center", cursor: "pointer",
                                 animation: "borderPulse 2s ease infinite"
-                            }}
-                                onClick={() => setTab("war")}>
+                            }} onClick={() => setTab("war")}>
                                 <div>
                                     <span style={{ fontSize: 16, marginRight: 8 }}>⚔️</span>
-                                    <strong style={{ color: "#fca5a5" }}>
-                                        WAR IN PROGRESS
-                                    </strong>
+                                    <strong style={{ color: "#fca5a5" }}>WAR IN PROGRESS</strong>
                                     <span style={{ color: "#6b7280", fontSize: 12, marginLeft: 8 }}>
                                         vs {clanData.active_war.clan_a_id === clan.id
                                             ? clanData.active_war.clan_b_name
                                             : clanData.active_war.clan_a_name}
                                     </span>
                                 </div>
-                                <span style={{ color: "#ef4444", fontWeight: 700, fontSize: 13 }}>
-                                    VIEW WAR →
-                                </span>
+                                <span style={{ color: "#ef4444", fontWeight: 700, fontSize: 13 }}>VIEW WAR →</span>
                             </div>
                         )}
 
@@ -561,21 +543,20 @@ export default function ClanPage() {
                                 ["war", "⚔️ War"],
                                 ...(isLeader ? [["search", "🔍 Recruit"]] as const : []),
                             ].map(([t, l]) => (
-                                <button key={t} className="tab"
-                                    onClick={() => setTab(t as any)} style={{
-                                        backgroundImage: tab === t
-                                            ? "linear-gradient(135deg,rgba(124,58,237,.5),rgba(190,24,93,.4))"
-                                            : "none",
-                                        background: tab === t ? undefined : "transparent",
-                                        color: tab === t ? "#e9d5ff" : "#6b7280",
-                                        boxShadow: tab === t ? "0 0 16px rgba(124,58,237,.3)" : "none",
-                                    }}>
+                                <button key={t} className="tab" onClick={() => setTab(t as any)} style={{
+                                    backgroundImage: tab === t
+                                        ? "linear-gradient(135deg,rgba(124,58,237,.5),rgba(190,24,93,.4))"
+                                        : "none",
+                                    background: tab === t ? undefined : "transparent",
+                                    color: tab === t ? "#e9d5ff" : "#6b7280",
+                                    boxShadow: tab === t ? "0 0 16px rgba(124,58,237,.3)" : "none",
+                                }}>
                                     {l}
                                 </button>
                             ))}
                         </div>
 
-                        {/* ── HOME TAB ──────────────────────────────────────────── */}
+                        {/* ── HOME TAB ──────────────────────────────────── */}
                         {tab === "home" && (
                             <div style={{ animation: "fadeIn .3s ease-out" }}>
                                 {clan.description && (
@@ -589,66 +570,146 @@ export default function ClanPage() {
                                     </div>
                                 )}
 
+                                {/* Leader legend */}
+                                {isLeader && (
+                                    <div style={{
+                                        background: "rgba(192,132,252,.06)",
+                                        border: "1px solid rgba(192,132,252,.18)",
+                                        borderRadius: 10, padding: "10px 16px",
+                                        marginBottom: 16, fontSize: 12, color: "#c084fc",
+                                        display: "flex", alignItems: "center", gap: 8
+                                    }}>
+                                        <span>👑</span>
+                                        <span>
+                                            As {myRole === "leader" ? "Leader" : "Co-Leader"}, you can
+                                            <strong> promote members to Co-Leader</strong> or demote them.
+                                            Click <strong>▲ PROMOTE</strong> or <strong>▼ DEMOTE</strong> on any member card.
+                                        </span>
+                                    </div>
+                                )}
+
                                 <div style={{
                                     fontFamily: "Cinzel", fontSize: 13, fontWeight: 700,
                                     color: "#9ca3af", letterSpacing: ".15em", marginBottom: 14
                                 }}>
                                     MEMBERS ({members.length})
                                 </div>
+
                                 <div className="members-grid">
-                                    {members.map((m: any, i: number) => (
-                                        <div key={m.user_id} style={{
-                                            background: m.user_id === user?.id
-                                                ? "rgba(124,58,237,.12)" : "rgba(255,255,255,.025)",
-                                            border: `1px solid ${m.user_id === user?.id
-                                                ? "rgba(168,85,247,.3)" : "rgba(255,255,255,.06)"}`,
-                                            borderRadius: 12, padding: "12px 14px",
-                                            display: "flex", alignItems: "center", gap: 12,
-                                            animation: `fadeIn .3s ease-out ${i * .05}s both`
-                                        }}>
-                                            <div style={{
-                                                width: 36, height: 36, borderRadius: "50%",
-                                                backgroundImage: `linear-gradient(135deg,${clan.badge_color}88,${clan.badge_color}44)`,
-                                                display: "flex", alignItems: "center",
-                                                justifyContent: "center", fontSize: 14,
-                                                fontWeight: 700, fontFamily: "Cinzel",
-                                                flexShrink: 0
+                                    {members.map((m: any, i: number) => {
+                                        const isMe = m.user_id === user?.id;
+                                        const isTargetLeader = m.role === "leader";
+                                        const canPromote = isLeader && !isMe && !isTargetLeader;
+                                        const isLoadingThis = promotingId === m.user_id;
+
+                                        return (
+                                            <div key={m.user_id} style={{
+                                                background: isMe
+                                                    ? "rgba(124,58,237,.12)" : "rgba(255,255,255,.025)",
+                                                border: `1px solid ${isMe
+                                                    ? "rgba(168,85,247,.3)" : "rgba(255,255,255,.06)"}`,
+                                                borderRadius: 12, padding: "12px 14px",
+                                                display: "flex", alignItems: "center", gap: 10,
+                                                animation: `fadeIn .3s ease-out ${i * .05}s both`,
+                                                transition: "all .2s",
                                             }}>
-                                                {m.username?.charAt(0).toUpperCase()}
-                                            </div>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                {/* Avatar */}
                                                 <div style={{
-                                                    fontWeight: 700, fontSize: 13,
-                                                    overflow: "hidden", textOverflow: "ellipsis",
-                                                    whiteSpace: "nowrap",
-                                                    color: m.user_id === user?.id ? "#c084fc" : "#e2e8f0"
+                                                    width: 38, height: 38, borderRadius: "50%",
+                                                    backgroundImage: `linear-gradient(135deg,${clan.badge_color}88,${clan.badge_color}44)`,
+                                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                                    fontSize: 15, fontWeight: 700, fontFamily: "Cinzel", flexShrink: 0,
+                                                    boxShadow: isTargetLeader ? `0 0 10px ${clan.badge_color}66` : "none",
                                                 }}>
-                                                    {m.username}
-                                                    {m.user_id === user?.id && (
-                                                        <span style={{
-                                                            fontSize: 9, color: "#7c3aed",
-                                                            marginLeft: 6
-                                                        }}>(you)</span>
-                                                    )}
+                                                    {m.username?.charAt(0).toUpperCase()}
                                                 </div>
-                                                <div style={{ fontSize: 10, color: "#6b7280", marginTop: 1 }}>
-                                                    Lv.{m.level} · {(m.xp || 0).toLocaleString()} XP
+
+                                                {/* Info */}
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{
+                                                        fontWeight: 700, fontSize: 13,
+                                                        overflow: "hidden", textOverflow: "ellipsis",
+                                                        whiteSpace: "nowrap",
+                                                        color: isMe ? "#c084fc" : "#e2e8f0",
+                                                        display: "flex", alignItems: "center", gap: 5,
+                                                    }}>
+                                                        {m.username}
+                                                        {isMe && (
+                                                            <span style={{ fontSize: 9, color: "#7c3aed" }}>(you)</span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ fontSize: 10, color: "#6b7280", marginTop: 1 }}>
+                                                        Lv.{m.level} · {(m.xp || 0).toLocaleString()} XP
+                                                    </div>
+                                                    {/* Role badge */}
+                                                    <div style={{
+                                                        fontSize: 9, marginTop: 3, fontWeight: 700,
+                                                        color: ROLE_COLORS[m.role] || "#6b7280",
+                                                        letterSpacing: ".06em",
+                                                    }}>
+                                                        {ROLE_LABELS[m.role] || m.role}
+                                                    </div>
                                                 </div>
+
+                                                {/* ✅ PROMOTE / DEMOTE BUTTON */}
+                                                {canPromote && (
+                                                    <button
+                                                        className="promote-btn"
+                                                        onClick={() => handlePromote(m.user_id, m.role)}
+                                                        disabled={isLoadingThis}
+                                                        title={m.role === "co_leader"
+                                                            ? "Demote to Member"
+                                                            : "Promote to Co-Leader"}
+                                                        style={{
+                                                            background: m.role === "co_leader"
+                                                                ? "rgba(239,68,68,.15)"
+                                                                : "rgba(192,132,252,.15)",
+                                                            border: `1px solid ${m.role === "co_leader"
+                                                                ? "rgba(239,68,68,.4)"
+                                                                : "rgba(192,132,252,.4)"}`,
+                                                            borderRadius: 8,
+                                                            padding: "5px 9px",
+                                                            color: m.role === "co_leader"
+                                                                ? "#f87171" : "#c084fc",
+                                                            fontSize: 10, fontWeight: 700,
+                                                            cursor: isLoadingThis ? "not-allowed" : "pointer",
+                                                            fontFamily: "Cinzel",
+                                                            flexShrink: 0,
+                                                            transition: "all .2s",
+                                                            opacity: isLoadingThis ? .5 : 1,
+                                                            whiteSpace: "nowrap",
+                                                            animation: isLoadingThis
+                                                                ? "pulse 1s infinite" : "none",
+                                                            boxShadow: m.role === "co_leader"
+                                                                ? "0 0 8px rgba(239,68,68,.2)"
+                                                                : "0 0 8px rgba(192,132,252,.2)",
+                                                        }}>
+                                                        {isLoadingThis
+                                                            ? "⏳"
+                                                            : m.role === "co_leader"
+                                                                ? "▼ DEMOTE"
+                                                                : "▲ PROMOTE"}
+                                                    </button>
+                                                )}
+
+                                                {/* Leader crown — no action */}
+                                                {isTargetLeader && (
+                                                    <div style={{
+                                                        fontSize: 18,
+                                                        filter: "drop-shadow(0 0 6px #fbbf24)",
+                                                        flexShrink: 0,
+                                                    }}>
+                                                        👑
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div style={{
-                                                fontSize: 10, color: ROLE_COLORS[m.role] || "#6b7280",
-                                                fontWeight: 700, flexShrink: 0
-                                            }}>
-                                                {m.role === "leader" ? "👑" : m.role === "co_leader" ? "⭐" : ""}
-                                                {m.role === "leader" ? "L" : m.role === "co_leader" ? "CL" : ""}
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
 
-                        {/* ── STUDY ROOM TAB ────────────────────────────────────── */}
+                        {/* ── STUDY ROOM TAB ────────────────────────────── */}
                         {tab === "room" && (
                             <div style={{ animation: "fadeIn .3s ease-out" }}>
                                 <div style={{
@@ -665,17 +726,14 @@ export default function ClanPage() {
                                     }}>
                                         <div style={{
                                             fontFamily: "Cinzel", fontSize: 12,
-                                            fontWeight: 700, color: "#22d3ee",
-                                            letterSpacing: ".15em"
+                                            fontWeight: 700, color: "#22d3ee", letterSpacing: ".15em"
                                         }}>
                                             💬 STUDY ROOM — {clan.name}
                                         </div>
                                         <div style={{
                                             fontSize: 10, color: "#22c55e",
                                             fontWeight: 700, animation: "pulse 1.5s infinite"
-                                        }}>
-                                            ● LIVE
-                                        </div>
+                                        }}>● LIVE</div>
                                     </div>
 
                                     {/* Messages */}
@@ -714,11 +772,9 @@ export default function ClanPage() {
                                                     textAlign: msg.user_id === user?.id ? "right" : "left"
                                                 }}>
                                                     <div style={{
-                                                        fontSize: 10, color: "#6b7280",
-                                                        marginBottom: 3, display: "flex", alignItems: "center",
-                                                        gap: 5,
-                                                        justifyContent: msg.user_id === user?.id
-                                                            ? "flex-end" : "flex-start"
+                                                        fontSize: 10, color: "#6b7280", marginBottom: 3,
+                                                        display: "flex", alignItems: "center", gap: 5,
+                                                        justifyContent: msg.user_id === user?.id ? "flex-end" : "flex-start"
                                                     }}>
                                                         <span>{MSG_TYPE_ICONS[msg.msg_type] || "💬"}</span>
                                                         <strong style={{ color: MSG_TYPE_COLORS[msg.msg_type] || "#9ca3af" }}>
@@ -743,11 +799,9 @@ export default function ClanPage() {
                                                                     ? "rgba(251,191,36,.3)"
                                                                     : "rgba(255,255,255,.08)"}`,
                                                         borderRadius: msg.user_id === user?.id
-                                                            ? "14px 14px 4px 14px"
-                                                            : "14px 14px 14px 4px",
+                                                            ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
                                                         padding: "9px 13px", fontSize: 13,
-                                                        color: "#e2e8f0", lineHeight: 1.55,
-                                                        wordBreak: "break-word"
+                                                        color: "#e2e8f0", lineHeight: 1.55, wordBreak: "break-word"
                                                     }}>
                                                         {msg.body}
                                                     </div>
@@ -759,19 +813,14 @@ export default function ClanPage() {
                                     {/* Message type selector */}
                                     <div style={{
                                         borderTop: "1px solid rgba(255,255,255,.05)",
-                                        padding: "10px 18px 0",
-                                        display: "flex", gap: 6
+                                        padding: "10px 18px 0", display: "flex", gap: 6
                                     }}>
                                         {Object.entries(MSG_TYPE_ICONS).map(([type, icon]) => (
                                             <button key={type} onClick={() => setMsgType(type)} style={{
-                                                background: msgType === type
-                                                    ? `${MSG_TYPE_COLORS[type]}22` : "transparent",
-                                                border: `1px solid ${msgType === type
-                                                    ? MSG_TYPE_COLORS[type] + "44" : "rgba(255,255,255,.06)"}`,
-                                                borderRadius: 20, padding: "4px 10px",
-                                                fontSize: 11, cursor: "pointer",
-                                                color: msgType === type
-                                                    ? MSG_TYPE_COLORS[type] : "#6b7280",
+                                                background: msgType === type ? `${MSG_TYPE_COLORS[type]}22` : "transparent",
+                                                border: `1px solid ${msgType === type ? MSG_TYPE_COLORS[type] + "44" : "rgba(255,255,255,.06)"}`,
+                                                borderRadius: 20, padding: "4px 10px", fontSize: 11,
+                                                cursor: "pointer", color: msgType === type ? MSG_TYPE_COLORS[type] : "#6b7280",
                                                 fontWeight: 600, transition: "all .15s"
                                             }}>
                                                 {icon} {type}
@@ -780,10 +829,7 @@ export default function ClanPage() {
                                     </div>
 
                                     {/* Input */}
-                                    <div style={{
-                                        padding: "10px 18px 18px",
-                                        display: "flex", gap: 8
-                                    }}>
+                                    <div style={{ padding: "10px 18px 18px", display: "flex", gap: 8 }}>
                                         <input value={msgInput}
                                             onChange={e => setMsgInput(e.target.value)}
                                             onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
@@ -802,37 +848,30 @@ export default function ClanPage() {
                                                 border: "none", borderRadius: 12, padding: "11px 18px",
                                                 color: "#fff", cursor: "pointer", fontSize: 16,
                                                 opacity: msgInput.trim() ? 1 : .4
-                                            }}>
-                                            ➤
-                                        </button>
+                                            }}>➤</button>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* ── WAR TAB ───────────────────────────────────────────── */}
+                        {/* ── WAR TAB ───────────────────────────────────── */}
                         {tab === "war" && (
                             <div style={{ animation: "fadeIn .3s ease-out" }}>
-
-                                {/* Disclaimer */}
                                 <div style={{
                                     backgroundImage: "linear-gradient(135deg,rgba(30,58,138,.3),rgba(88,28,135,.3))",
                                     border: "1px solid rgba(99,102,241,.3)",
                                     borderRadius: 14, padding: "16px 20px", marginBottom: 20
                                 }}>
                                     <div style={{
-                                        fontFamily: "Cinzel", fontSize: 12,
-                                        fontWeight: 700, color: "#818cf8",
-                                        letterSpacing: ".15em", marginBottom: 8
+                                        fontFamily: "Cinzel", fontSize: 12, fontWeight: 700,
+                                        color: "#818cf8", letterSpacing: ".15em", marginBottom: 8
                                     }}>
                                         ☮️ ABOUT CLAN WARS
                                     </div>
                                     <p style={{ fontSize: 13, color: "#a5b4fc", lineHeight: 1.7, margin: 0 }}>
                                         <strong>EduRPG is firmly against real-world conflict.</strong> Clan Wars
                                         are a <strong>purely academic competition</strong> — students battle by
-                                        answering quiz questions, not through any form of aggression. The goal
-                                        is learning together, testing knowledge and celebrating academic
-                                        excellence. Win with wisdom, not weapons. 📚
+                                        answering quiz questions. Win with wisdom, not weapons. 📚
                                     </p>
                                 </div>
 
@@ -857,13 +896,12 @@ export default function ClanPage() {
                             </div>
                         )}
 
-                        {/* ── RECRUIT TAB (leaders only) ────────────────────────── */}
+                        {/* ── RECRUIT TAB (leaders only) ────────────────── */}
                         {tab === "search" && isLeader && (
                             <div style={{ animation: "fadeIn .3s ease-out" }}>
                                 <div style={{
-                                    fontFamily: "Cinzel", fontSize: 12,
-                                    color: "#6b7280", letterSpacing: ".15em",
-                                    fontWeight: 700, marginBottom: 16
+                                    fontFamily: "Cinzel", fontSize: 12, color: "#6b7280",
+                                    letterSpacing: ".15em", fontWeight: 700, marginBottom: 16
                                 }}>
                                     BROWSE & RECRUIT PLAYERS
                                 </div>
@@ -882,11 +920,9 @@ export default function ClanPage() {
                                     <button onClick={handleSearch} style={{
                                         backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d)",
                                         border: "none", borderRadius: 12, padding: "12px 20px",
-                                        color: "#fff", fontFamily: "Cinzel",
-                                        fontSize: 12, fontWeight: 700, cursor: "pointer"
-                                    }}>
-                                        🔍
-                                    </button>
+                                        color: "#fff", fontFamily: "Cinzel", fontSize: 12,
+                                        fontWeight: 700, cursor: "pointer"
+                                    }}>🔍</button>
                                 </div>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                     {searchResults.map((c, i) => (
@@ -902,7 +938,7 @@ export default function ClanPage() {
     );
 }
 
-// ── Sub-components ──────────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────
 
 function ClanCard({ clan, i, onJoin }: { clan: any; i: number; onJoin?: () => void }) {
     return (
@@ -916,17 +952,11 @@ function ClanCard({ clan, i, onJoin }: { clan: any; i: number; onJoin?: () => vo
             flexWrap: "wrap"
         }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{
-                    fontSize: 32,
-                    filter: `drop-shadow(0 0 8px ${clan.badge_color})`
-                }}>
+                <span style={{ fontSize: 32, filter: `drop-shadow(0 0 8px ${clan.badge_color})` }}>
                     {clan?.badge_emoji}
                 </span>
                 <div>
-                    <div style={{
-                        fontFamily: "Cinzel", fontSize: 15,
-                        fontWeight: 700, color: clan.badge_color
-                    }}>
+                    <div style={{ fontFamily: "Cinzel", fontSize: 15, fontWeight: 700, color: clan.badge_color }}>
                         {clan.name}
                     </div>
                     <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
@@ -941,10 +971,8 @@ function ClanCard({ clan, i, onJoin }: { clan: any; i: number; onJoin?: () => vo
                 <button onClick={onJoin} style={{
                     backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d)",
                     border: "none", borderRadius: 10, padding: "9px 18px",
-                    color: "#fff", fontFamily: "Cinzel",
-                    fontSize: 11, fontWeight: 700, cursor: "pointer",
-                    boxShadow: "0 0 14px rgba(124,58,237,.35)",
-                    whiteSpace: "nowrap"
+                    color: "#fff", fontFamily: "Cinzel", fontSize: 11, fontWeight: 700,
+                    cursor: "pointer", boxShadow: "0 0 14px rgba(124,58,237,.35)", whiteSpace: "nowrap"
                 }}>
                     JOIN →
                 </button>
@@ -979,10 +1007,7 @@ function NoClanWar({ isLeader, clanId, token, onDeclared }:
                 fontSize: 64, marginBottom: 16,
                 filter: "drop-shadow(0 0 16px rgba(239,68,68,.6))"
             }}>⚔️</div>
-            <div style={{
-                fontFamily: "Cinzel", fontSize: 22,
-                fontWeight: 700, color: "#9ca3af", marginBottom: 8
-            }}>
+            <div style={{ fontFamily: "Cinzel", fontSize: 22, fontWeight: 700, color: "#9ca3af", marginBottom: 8 }}>
                 NO ACTIVE WAR
             </div>
             <p style={{ color: "#4b5563", fontSize: 14, marginBottom: 28 }}>
@@ -993,47 +1018,35 @@ function NoClanWar({ isLeader, clanId, token, onDeclared }:
                     background: "rgba(0,0,0,.4)",
                     border: "1px solid rgba(239,68,68,.2)",
                     borderRadius: 16, padding: "24px",
-                    maxWidth: 400, margin: "0 auto",
-                    textAlign: "left"
+                    maxWidth: 400, margin: "0 auto", textAlign: "left"
                 }}>
                     <div style={{
-                        fontFamily: "Cinzel", fontSize: 12,
-                        fontWeight: 700, color: "#f87171",
-                        letterSpacing: ".15em", marginBottom: 16
+                        fontFamily: "Cinzel", fontSize: 12, fontWeight: 700,
+                        color: "#f87171", letterSpacing: ".15em", marginBottom: 16
                     }}>
                         🚨 DECLARE ACADEMIC WAR
                     </div>
                     {error && (
                         <div style={{
-                            background: "rgba(127,29,29,.3)",
-                            border: "1px solid rgba(239,68,68,.3)",
-                            borderRadius: 8, padding: "8px 12px",
-                            fontSize: 12, color: "#fca5a5",
-                            marginBottom: 12
-                        }}>
-                            {error}
-                        </div>
+                            background: "rgba(127,29,29,.3)", border: "1px solid rgba(239,68,68,.3)",
+                            borderRadius: 8, padding: "8px 12px", fontSize: 12,
+                            color: "#fca5a5", marginBottom: 12
+                        }}>{error}</div>
                     )}
-                    <input value={targetId}
-                        onChange={e => setTargetId(e.target.value)}
+                    <input value={targetId} onChange={e => setTargetId(e.target.value)}
                         placeholder="Target Clan ID"
                         style={{
                             width: "100%", background: "rgba(0,0,0,.5)",
-                            border: "1px solid rgba(255,255,255,.1)",
-                            borderRadius: 10, padding: "11px 14px",
-                            color: "#e2e8f0", fontSize: 13,
-                            fontFamily: "Rajdhani", fontWeight: 500,
-                            outline: "none", marginBottom: 10
+                            border: "1px solid rgba(255,255,255,.1)", borderRadius: 10,
+                            padding: "11px 14px", color: "#e2e8f0", fontSize: 13,
+                            fontFamily: "Rajdhani", fontWeight: 500, outline: "none", marginBottom: 10
                         }} />
-                    <select value={topic}
-                        onChange={e => setTopic(e.target.value)}
+                    <select value={topic} onChange={e => setTopic(e.target.value)}
                         style={{
                             width: "100%", background: "#0a0a15",
-                            border: "1px solid rgba(255,255,255,.1)",
-                            borderRadius: 10, padding: "11px 14px",
-                            color: "#e2e8f0", fontSize: 13,
-                            fontFamily: "Rajdhani", outline: "none",
-                            marginBottom: 14
+                            border: "1px solid rgba(255,255,255,.1)", borderRadius: 10,
+                            padding: "11px 14px", color: "#e2e8f0", fontSize: 13,
+                            fontFamily: "Rajdhani", outline: "none", marginBottom: 14
                         }}>
                         {["python-basics", "python-loops", "algebra-basics", "calculus",
                             "physics-mechanics", "chemistry", "machine-learning"].map(t => (
@@ -1044,20 +1057,15 @@ function NoClanWar({ isLeader, clanId, token, onDeclared }:
                     </select>
                     <button onClick={declare} disabled={loading || !targetId.trim()}
                         style={{
-                            width: "100%",
-                            backgroundImage: "linear-gradient(135deg,#dc2626,#991b1b)",
+                            width: "100%", backgroundImage: "linear-gradient(135deg,#dc2626,#991b1b)",
                             border: "none", borderRadius: 10, padding: "12px",
-                            color: "#fff", fontFamily: "Cinzel",
-                            fontSize: 13, fontWeight: 700, cursor: "pointer",
-                            opacity: (!targetId.trim() || loading) ? .5 : 1,
+                            color: "#fff", fontFamily: "Cinzel", fontSize: 13, fontWeight: 700,
+                            cursor: "pointer", opacity: (!targetId.trim() || loading) ? .5 : 1,
                             boxShadow: "0 0 20px rgba(220,38,38,.4)"
                         }}>
                         {loading ? "⏳ Declaring..." : "⚔️ DECLARE WAR"}
                     </button>
-                    <p style={{
-                        fontSize: 10, color: "#4b5563",
-                        marginTop: 10, textAlign: "center"
-                    }}>
+                    <p style={{ fontSize: 10, color: "#4b5563", marginTop: 10, textAlign: "center" }}>
                         24h preparation, then 24h war window
                     </p>
                 </div>
@@ -1073,17 +1081,16 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
     }) {
     const war = warData.war;
     const matchups = warData.matchups || [];
-    const mine = warData.my_matchups || [];
     const [assigning, setAssigning] = useState(false);
     const [form, setForm] = useState({ attacker_id: "", defender_id: "", topic: "python-basics" });
     const [error, setError] = useState("");
     const headers = { Authorization: `Bearer ${token}` };
 
-    const isA = war.clan_a_id === clan.id;
-    const myScore = isA ? war.clan_a_score : war.clan_b_score;
+    const isA      = war.clan_a_id === clan.id;
+    const myScore  = isA ? war.clan_a_score : war.clan_b_score;
     const theirScore = isA ? war.clan_b_score : war.clan_a_score;
-    const enemyName = isA ? war.clan_b_name : war.clan_a_name;
-    const winning = myScore > theirScore;
+    const enemyName  = isA ? war.clan_b_name : war.clan_a_name;
+    const winning    = myScore > theirScore;
     const statusColor = war.status === "ended"
         ? (war.winner_clan_id === clan.id ? "#22c55e" : "#ef4444") : "#fbbf24";
 
@@ -1109,9 +1116,8 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
                 marginBottom: 20, textAlign: "center"
             }}>
                 <div style={{
-                    fontSize: 10, color: statusColor,
-                    fontFamily: "Cinzel", letterSpacing: ".2em",
-                    fontWeight: 700, marginBottom: 12
+                    fontSize: 10, color: statusColor, fontFamily: "Cinzel",
+                    letterSpacing: ".2em", fontWeight: 700, marginBottom: 12
                 }}>
                     {war.status === "preparation" ? "⏳ PREPARATION PHASE"
                         : war.status === "active" ? "⚔️ WAR IN PROGRESS"
@@ -1124,29 +1130,22 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
                 }}>
                     <div style={{ textAlign: "center" }}>
                         <div style={{
-                            fontSize: "clamp(22px,6vw,32px)",
-                            fontFamily: "Cinzel", fontWeight: 900,
-                            color: winning ? "#22c55e" : "#e2e8f0"
-                        }}>
-                            {myScore}
-                        </div>
+                            fontSize: "clamp(22px,6vw,32px)", fontFamily: "Cinzel",
+                            fontWeight: 900, color: winning ? "#22c55e" : "#e2e8f0"
+                        }}>{myScore}</div>
                         <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
                             {clan?.badge_emoji} {clan.name}
                         </div>
                     </div>
                     <div style={{
-                        fontFamily: "Cinzel",
-                        fontSize: "clamp(20px,5vw,28px)", fontWeight: 900,
-                        color: "#ef4444"
+                        fontFamily: "Cinzel", fontSize: "clamp(20px,5vw,28px)",
+                        fontWeight: 900, color: "#ef4444"
                     }}>VS</div>
                     <div style={{ textAlign: "center" }}>
                         <div style={{
-                            fontSize: "clamp(22px,6vw,32px)",
-                            fontFamily: "Cinzel", fontWeight: 900,
-                            color: !winning ? "#22c55e" : "#e2e8f0"
-                        }}>
-                            {theirScore}
-                        </div>
+                            fontSize: "clamp(22px,6vw,32px)", fontFamily: "Cinzel",
+                            fontWeight: 900, color: !winning ? "#22c55e" : "#e2e8f0"
+                        }}>{theirScore}</div>
                         <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
                             ⚔️ {enemyName}
                         </div>
@@ -1160,15 +1159,15 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
                 </div>
             </div>
 
-            {/* Assign matchup (leader only) */}
+            {/* Assign matchup */}
             {isLeader && war.status !== "ended" && (
                 <div style={{ marginBottom: 20 }}>
                     <button onClick={() => setAssigning(v => !v)} style={{
                         backgroundImage: "linear-gradient(135deg,#dc2626,#7c3aed)",
                         border: "none", borderRadius: 12, padding: "11px 24px",
-                        color: "#fff", fontFamily: "Cinzel",
-                        fontSize: 12, fontWeight: 700, cursor: "pointer",
-                        letterSpacing: ".08em", marginBottom: assigning ? 14 : 0
+                        color: "#fff", fontFamily: "Cinzel", fontSize: 12,
+                        fontWeight: 700, cursor: "pointer", letterSpacing: ".08em",
+                        marginBottom: assigning ? 14 : 0
                     }}>
                         {assigning ? "✕ Cancel" : "⚔️ ASSIGN MATCHUP"}
                     </button>
@@ -1179,19 +1178,14 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
                             borderRadius: 14, padding: "18px",
                             animation: "slideUp .25s ease-out"
                         }}>
-                            {error && <div style={{
-                                color: "#f87171",
-                                fontSize: 12, marginBottom: 10
-                            }}>{error}</div>}
+                            {error && <div style={{ color: "#f87171", fontSize: 12, marginBottom: 10 }}>{error}</div>}
                             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                 <select value={form.attacker_id}
                                     onChange={e => setForm({ ...form, attacker_id: e.target.value })}
                                     style={{
-                                        background: "#0a0a15",
-                                        border: "1px solid rgba(255,255,255,.1)",
-                                        borderRadius: 10, padding: "10px 14px",
-                                        color: "#e2e8f0", fontSize: 13,
-                                        fontFamily: "Rajdhani", outline: "none"
+                                        background: "#0a0a15", border: "1px solid rgba(255,255,255,.1)",
+                                        borderRadius: 10, padding: "10px 14px", color: "#e2e8f0",
+                                        fontSize: 13, fontFamily: "Rajdhani", outline: "none"
                                     }}>
                                     <option value="">Select YOUR member (attacker)...</option>
                                     {members.map(m => (
@@ -1204,21 +1198,16 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
                                     onChange={e => setForm({ ...form, defender_id: e.target.value })}
                                     placeholder="Enemy player ID to defend"
                                     style={{
-                                        background: "rgba(0,0,0,.5)",
-                                        border: "1px solid rgba(255,255,255,.1)",
-                                        borderRadius: 10, padding: "10px 14px",
-                                        color: "#e2e8f0", fontSize: 13,
-                                        fontFamily: "Rajdhani", fontWeight: 500,
-                                        outline: "none"
+                                        background: "rgba(0,0,0,.5)", border: "1px solid rgba(255,255,255,.1)",
+                                        borderRadius: 10, padding: "10px 14px", color: "#e2e8f0",
+                                        fontSize: 13, fontFamily: "Rajdhani", fontWeight: 500, outline: "none"
                                     }} />
                                 <select value={form.topic}
                                     onChange={e => setForm({ ...form, topic: e.target.value })}
                                     style={{
-                                        background: "#0a0a15",
-                                        border: "1px solid rgba(255,255,255,.1)",
-                                        borderRadius: 10, padding: "10px 14px",
-                                        color: "#e2e8f0", fontSize: 13,
-                                        fontFamily: "Rajdhani", outline: "none"
+                                        background: "#0a0a15", border: "1px solid rgba(255,255,255,.1)",
+                                        borderRadius: 10, padding: "10px 14px", color: "#e2e8f0",
+                                        fontSize: 13, fontFamily: "Rajdhani", outline: "none"
                                     }}>
                                     {["python-basics", "python-loops", "python-functions",
                                         "algebra-basics", "calculus", "physics-mechanics",
@@ -1233,8 +1222,8 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
                                     style={{
                                         backgroundImage: "linear-gradient(135deg,#dc2626,#991b1b)",
                                         border: "none", borderRadius: 10, padding: "11px",
-                                        color: "#fff", fontFamily: "Cinzel",
-                                        fontSize: 12, fontWeight: 700, cursor: "pointer",
+                                        color: "#fff", fontFamily: "Cinzel", fontSize: 12,
+                                        fontWeight: 700, cursor: "pointer",
                                         opacity: (!form.attacker_id || !form.defender_id) ? .5 : 1
                                     }}>
                                     ⚔️ ASSIGN BATTLE
@@ -1245,7 +1234,7 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
                 </div>
             )}
 
-            {/* Matchups list */}
+            {/* Matchups */}
             <div style={{
                 fontFamily: "Cinzel", fontSize: 12, fontWeight: 700,
                 color: "#9ca3af", letterSpacing: ".15em", marginBottom: 12
@@ -1294,10 +1283,7 @@ function WarView({ warData, clan, userId, isLeader, members, onRefresh, token }:
                     </div>
                 ))}
                 {matchups.length === 0 && (
-                    <div style={{
-                        textAlign: "center", padding: 32,
-                        color: "#374151", fontSize: 13
-                    }}>
+                    <div style={{ textAlign: "center", padding: 32, color: "#374151", fontSize: 13 }}>
                         No matchups assigned yet.
                         {isLeader ? " Use 'Assign Matchup' to deploy your warriors." : ""}
                     </div>
