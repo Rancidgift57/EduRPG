@@ -16,7 +16,7 @@ def run_ping():
         return
 
     # 2. Get URL from GitHub Secrets (or hardcode it if you prefer)
-    url = os.getenv("RENDER_URL", "https://your-app-name.onrender.com")
+    url = os.getenv("RENDER_URL", "https://edurpg.onrender.com")
 
     # 3. Rotate User-Agents to mimic different devices/browsers
     user_agents = [
