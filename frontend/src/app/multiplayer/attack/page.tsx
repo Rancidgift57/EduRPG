@@ -60,7 +60,7 @@ export default function MultiplayerAttackPage() {
             isSubmittingRef.current = false;
             qStartTimeRef.current = 30;
             setCurrentQIdx(next);
-            resetQuestionTimer();   // defined below after useBattleTimer
+            resetQuestionTimer();
         }
     }, []);
 
@@ -76,22 +76,19 @@ export default function MultiplayerAttackPage() {
 
     // ── Timer callbacks ───────────────────────────────────────────────
     const handleQuestionExpire = useCallback(() => {
-        // Stale closure safe — using refs
         if (answeredRef.current || isSubmittingRef.current) return;
 
         const q = myQsRef.current[currentQIdxRef.current];
         if (!q) return;
 
-        // Record as timeout (-1)
         const newAnswers = { ...answersRef.current, [q.id]: -1 };
         answersRef.current = newAnswers;
         setAnswers(newAnswers);
 
-        totalTimeRef.current += 30;  // used full 30s
+        totalTimeRef.current += 30;
         answeredRef.current = true;
         setShowQExpired(true);
 
-        // Auto-advance after overlay shows
         setTimeout(() => {
             setShowQExpired(false);
             advanceQuestion();
@@ -101,7 +98,6 @@ export default function MultiplayerAttackPage() {
     const handleBattleExpire = useCallback(() => {
         stopTimers();
         setShowBExpired(true);
-        // Auto-submit after overlay
         setTimeout(() => autoSubmitAll(), 2500);
     }, [autoSubmitAll]);
 
@@ -133,7 +129,6 @@ export default function MultiplayerAttackPage() {
             setCurrentQIdx(next);
             resetQuestionTimer();
         }
-        // If all done, timer just keeps running until manually submitted
     }, [resetQuestionTimer]);
 
     // ── Find opponent ─────────────────────────────────────────────────
@@ -176,8 +171,6 @@ export default function MultiplayerAttackPage() {
             myQsRef.current = mine;
             setMyQs(mine);
             setStep("answer");
-
-            // ✅ Start multiplayer timers NOW — only in multiplayer
             startTimers();
         } catch (e: any) {
             alert(e.response?.data?.detail || "Error");
@@ -199,12 +192,11 @@ export default function MultiplayerAttackPage() {
 
         answeredRef.current = true;
         isSubmittingRef.current = true;
-        pauseTimer();  // ⏸ freeze timer while "processing"
+        pauseTimer();
 
-        // Short pause to show selection, then advance
         setTimeout(() => {
             isSubmittingRef.current = false;
-            resumeTimer();  // ▶ resume
+            resumeTimer();
             advanceQuestionFull();
         }, 600);
     }, [questionTimeLeft, pauseTimer, resumeTimer, advanceQuestionFull]);
@@ -420,7 +412,7 @@ export default function MultiplayerAttackPage() {
                         </div>
                     </div>
 
-                    {/* ✅ BATTLE CLOCK — only shown in multiplayer answer phase */}
+                    {/* BATTLE CLOCK */}
                     <BattleClock timeLeft={battleTimeLeft} isPaused={isPaused} />
                 </div>
 
@@ -463,7 +455,7 @@ export default function MultiplayerAttackPage() {
                         marginBottom: 16,
                         animation: "mpFadeIn .3s ease-out",
                     }}>
-                        {/* ✅ QUESTION TIMER BAR — only in multiplayer */}
+                        {/* QUESTION TIMER BAR */}
                         <QuestionTimerBar
                             timeLeft={questionTimeLeft}
                             maxTime={30}
@@ -580,21 +572,6 @@ export default function MultiplayerAttackPage() {
                     </div>
                 )}
             </div>
-
-            <style>{`
-        @keyframes mpFadeIn {
-          from { opacity:0; transform:translateY(14px); }
-          to   { opacity:1; transform:translateY(0); }
-        }
-        @keyframes mpPulse {
-          0%,100% { opacity:.5; }
-          50%      { opacity:1; }
-        }
-        @keyframes mpSpin {
-          from { transform:rotate(0); }
-          to   { transform:rotate(360deg); }
-        }
-      `}</style>
         </Screen>
     );
 
@@ -645,12 +622,6 @@ export default function MultiplayerAttackPage() {
                     🏠 BACK TO HUB
                 </button>
             </div>
-            <style>{`
-        @keyframes mpSpin {
-          from { transform:rotate(0); }
-          to   { transform:rotate(360deg); }
-        }
-      `}</style>
         </Screen>
     );
 
@@ -673,17 +644,118 @@ function Screen({ children }: { children: React.ReactNode }) {
             paddingTop: "clamp(24px,5vw,48px)",
         }}>
             <style>{`
+                /* ── Multiplayer core ── */
                 @keyframes mpFadeIn {
                     from { opacity: 0; transform: translateY(14px); }
                     to   { opacity: 1; transform: translateY(0); }
                 }
                 @keyframes mpPulse {
                     0%, 100% { opacity: .5; }
-                    50%       { opacity: 1; }
+                    50%      { opacity: 1; }
                 }
                 @keyframes mpSpin {
                     from { transform: rotate(0deg); }
                     to   { transform: rotate(360deg); }
+                }
+
+                /* ── Hero animations ── */
+                @keyframes heroIdle {
+                    0%, 100% { transform: translateY(0px); }
+                    50%      { transform: translateY(-7px); }
+                }
+                @keyframes heroAttackForward {
+                    0%   { transform: translateX(0) scale(1); }
+                    40%  { transform: translateX(60px) scale(1.12); }
+                    70%  { transform: translateX(50px) scale(1.08); }
+                    100% { transform: translateX(0) scale(1); }
+                }
+                @keyframes heroHit {
+                    0%, 100% { transform: translateX(0); filter: brightness(1); }
+                    25%      { transform: translateX(-12px); filter: brightness(2) saturate(0); }
+                    75%      { transform: translateX(6px); filter: brightness(1.5); }
+                }
+
+                /* ── Monster animations ── */
+                @keyframes monsterIdle {
+                    0%, 100% { transform: scaleX(-1) translateY(0px); }
+                    50%      { transform: scaleX(-1) translateY(-7px); }
+                }
+                @keyframes monsterAttackForward {
+                    0%   { transform: scaleX(-1) translateX(0) scale(1); }
+                    40%  { transform: scaleX(-1) translateX(60px) scale(1.12); }
+                    70%  { transform: scaleX(-1) translateX(50px) scale(1.08); }
+                    100% { transform: scaleX(-1) translateX(0) scale(1); }
+                }
+                @keyframes monsterHit {
+                    0%, 100% { transform: scaleX(-1) translateX(0); filter: brightness(1); }
+                    25%      { transform: scaleX(-1) translateX(12px); filter: brightness(2) saturate(0); }
+                    75%      { transform: scaleX(-1) translateX(-6px); filter: brightness(1.5); }
+                }
+                @keyframes deathAnim {
+                    0%   { opacity: 1; transform: scaleX(-1) scale(1) translateY(0); filter: brightness(1); }
+                    40%  { opacity: 0.7; transform: scaleX(-1) scale(1.1) translateY(-10px); filter: brightness(3) saturate(0); }
+                    100% { opacity: 0; transform: scaleX(-1) scale(0.3) translateY(30px) rotate(20deg); filter: brightness(0); }
+                }
+
+                /* ── UI effects ── */
+                @keyframes shimmer {
+                    0%   { background-position: -200% center; }
+                    100% { background-position: 200% center; }
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to   { transform: rotate(360deg); }
+                }
+                @keyframes vsFlash {
+                    0%, 100% { opacity: 0.7; text-shadow: 0 0 20px rgba(168,85,247,0.4); }
+                    50%      { opacity: 1;   text-shadow: 0 0 40px rgba(168,85,247,0.9), 0 0 80px rgba(168,85,247,0.5); }
+                }
+                @keyframes glowPulse {
+                    0%, 100% { opacity: 0.7; }
+                    50%      { opacity: 1; text-shadow: 0 0 10px #22c55e; }
+                }
+                @keyframes critFlash {
+                    0%   { opacity: 0; transform: translateX(-50%) scale(0.5) rotate(-8deg); }
+                    20%  { opacity: 1; transform: translateX(-50%) scale(1.3) rotate(3deg); }
+                    60%  { opacity: 1; transform: translateX(-50%) scale(1.05) rotate(-1deg); }
+                    100% { opacity: 0; transform: translateX(-50%) scale(0.9) translateY(-20px); }
+                }
+                @keyframes spellShot {
+                    0%   { opacity: 1; transform: translateX(0) scale(1); }
+                    100% { opacity: 0; transform: translateX(180px) scale(0.4); }
+                }
+                @keyframes floatUp {
+                    0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+                    100% { opacity: 0; transform: translateX(-50%) translateY(-50px); }
+                }
+                @keyframes bounceIn {
+                    0%   { transform: scale(0.4); opacity: 0; }
+                    60%  { transform: scale(1.15); opacity: 1; }
+                    80%  { transform: scale(0.95); }
+                    100% { transform: scale(1); }
+                }
+                @keyframes fadeSlideIn {
+                    from { opacity: 0; transform: translateY(14px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes victoryPulse {
+                    0%, 100% { box-shadow: 0 0 100px rgba(251,191,36,0.4); }
+                    50%      { box-shadow: 0 0 140px rgba(251,191,36,0.75); }
+                }
+                @keyframes defeatPulse {
+                    0%, 100% { box-shadow: 0 0 100px rgba(239,68,68,0.4); }
+                    50%      { box-shadow: 0 0 140px rgba(239,68,68,0.75); }
+                }
+                @keyframes bossGlow {
+                    0%, 100% { box-shadow: none; }
+                    50%      { box-shadow: 0 0 20px rgba(239,68,68,0.6); }
+                }
+                @keyframes groundShake {
+                    0%, 100% { transform: translateX(0); }
+                    20%      { transform: translateX(-6px) rotate(-0.4deg); }
+                    40%      { transform: translateX(6px)  rotate(0.4deg); }
+                    60%      { transform: translateX(-4px); }
+                    80%      { transform: translateX(4px); }
                 }
             `}</style>
             <div style={{ width: "100%", maxWidth: 740 }}>{children}</div>
