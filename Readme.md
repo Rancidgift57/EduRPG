@@ -1011,15 +1011,20 @@ scaled_atk = ceil(base_attack * (1 + user_level * 0.05))
 
 ---
 
-### Hero System
+### 🛡️ Hero System
 
 | Hero | Subject | Attack | Defense | HP | Skill | Unlocks |
-|------|---------|--------|---------|-----|-------|---------|
-| ⚔️ Samurai | Mathematics | 25 | 12 | 110 | Double Strike (2× damage) | Level 1 |
-| 🔮 Wizard | Programming | 30 | 8 | 90 | Hint Spell (reveal wrong option) | Level 1 |
-| 🥷 Ninja | Science | 22 | 15 | 100 | Shadow Dodge (skip penalty) | Level 5 |
-| 🛡️ Knight | History | 18 | 20 | 130 | Iron Shield (50% damage reduction) | Level 8 |
-| 🤖 Robot | AI Technology | 28 | 10 | 95 | Data Scan (show topic hint) | Level 12 |
+| :--- | :--- | :---: | :---: | :---: | :--- | :--- |
+| ⚔️ **Samurai** | Mathematics | 25 | 12 | 110 | **Double Strike** (2× damage) | Level 1 |
+| 🔮 **Wizard** | Programming | 30 | 8 | 90 | **Hint Spell** (reveal wrong option) | Level 1 |
+| 🏹 **Archer** | Science | 22 | 11 | 105 | **Precise Shot** (guaranteed crit) | Level 1 |
+| 🥷 **Ninja** | Chemistry | 28 | 15 | 100 | **Shadow Dodge** (skip penalty) | Level 4 |
+| 🛡️ **Knight** | History | 18 | 22 | 140 | **Iron Shield** (50% dmg reduction) | Level 6 |
+| 🤖 **Robot** | AI Tech | 32 | 10 | 95 | **Data Scan** (show topic hint) | Level 9 |
+| 🍃 **Druid** | Biology | 20 | 14 | 120 | **Nature Heal** (restore 20 HP) | Level 11 |
+| 🩸 **Berserker**| Physics | 40 | 5 | 85 | **Rage Mode** (1.5x ATK bonus) | Level 14 |
+| 👁️ **Oracle** | Philosophy | 24 | 16 | 115 | **Foresight** (see next question) | Level 17 |
+| 👑 **Titan** | All Subjects | 35 | 20 | 160 | **Titan Force** (ignore monster DEF) | Level 20 |
 
 ---
 
