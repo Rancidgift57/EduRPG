@@ -79,7 +79,7 @@ Students aged 15–25 learning STEM subjects: Mathematics, Science, Programming,
 
 | Feature | Description |
 |---------|-------------|
-| 🗡️ **Hero System** | 5 unique heroes — Samurai, Wizard, Ninja, Knight, Robot — each specializing in a subject |
+| 🗡️ **Hero System** | 10 unique heroes — Samurai, Wizard, Ninja, Knight, Robot — each specializing in a subject |
 | 👹 **Monster System** | 10+ monsters themed to topics — Loop Dragon, OOP Overlord, Calculus Titan, etc. |
 | ⚔️ **Battle System** | Answer questions to attack. Wrong answer = monster attacks back. Real HP/damage mechanics |
 | 🤖 **AI Tutor** | HuggingFace Mistral-7B explains wrong answers, gives hints, generates quiz questions |
