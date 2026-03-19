@@ -21,10 +21,6 @@ jobs:
       - name: Install Libraries
         run: pip install requests pytz
 
-      - name: Random YAML Delay
-        # Shortened delay to 1-60 seconds so we don't waste the 5-min window
-        run: sleep $(( ( RANDOM % 60 ) + 1 ))
-
       - name: Execute Pinger Script
         env:
           RENDER_URL: ${{ secrets.RENDER_URL }} 
