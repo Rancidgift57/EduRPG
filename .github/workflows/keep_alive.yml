@@ -2,9 +2,9 @@ name: Stealth Render Pinger
 
 on:
   schedule:
-    # This triggers the "Action" roughly every 10 minutes
-    - cron: '*/10 * * * *'
-  workflow_dispatch: # This adds a "Run" button so you can test it manually
+    # Changed from 10 mins to 5 mins to stay ahead of GitHub delays
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
 
 jobs:
   ping-job:
@@ -13,20 +13,19 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Python Environment
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
       - name: Install Libraries
-        run: pip install -r requirements.txt
+        run: pip install requests pytz
 
       - name: Random YAML Delay
-        # Random sleep between 1 and 240 seconds (4 minutes)
-        run: sleep $(( ( RANDOM % 240 )  + 1 ))
+        # Shortened delay to 1-60 seconds so we don't waste the 5-min window
+        run: sleep $(( ( RANDOM % 60 ) + 1 ))
 
       - name: Execute Pinger Script
         env:
-          # This pulls your URL from GitHub Secrets safely
           RENDER_URL: ${{ secrets.RENDER_URL }} 
         run: python pinger.py
