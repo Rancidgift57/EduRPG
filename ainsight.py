@@ -22,7 +22,7 @@ app.add_middleware(
 )
 
 # ── HuggingFace model (lazy-loaded once) ──────────────────────────────────────
-MODEL_ID = "google/flan-t5-large"   # good balance of quality vs. size
+MODEL_ID = "google/flan-t5-small"   # good balance of quality vs. size
                                      # upgrade to "google/flan-t5-xl" for better results
 
 
