@@ -73,7 +73,7 @@ Generate a JSON object (no markdown, no backticks, pure JSON) with these fields:
 The tricks should be practical memory hacks, mnemonics, or shortcuts to master ${topic.label} faster. Keep everything concise and gamified in tone.`;
 
         try {
-            const response = await fetch("https://edurpg-shn7.onrender.com/insights", {
+            const response = await fetch("https://edurpg-1.onrender.com/insights", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
