@@ -159,6 +159,11 @@ def run_prompt(pipe, prompt: str) -> str:
     return results[0]["generated_text"].strip()
 
 
+@app.get("/")
+async def root():
+    return {"message": "AI Mentor API is running. Visit /health for status."}
+
+
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 @app.post("/insights", response_model=InsightResponse)
 async def get_insights(req: InsightRequest) -> InsightResponse:
