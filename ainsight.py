@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from huggingface_hub import InferenceClient
 
 # ── App setup ────────────────────────────────────────────────────────────────
-app = FastAPI(title="AI Mentor — HuggingFace API Backend", version="2.0.0")
+app = FastAPI(title="AI Mentor — HuggingFace API Backend", version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,8 +20,7 @@ app.add_middleware(
 )
 
 # ── HuggingFace API Setup ────────────────────────────────────────────────────
-HF_API_KEY = os.getenv("HF_API_KEY")  # set this in Render
-
+HF_API_KEY = os.getenv("HF_API_KEY")
 if not HF_API_KEY:
     raise ValueError("HF_API_KEY not set")
 
@@ -30,13 +29,39 @@ client = InferenceClient(
     token=HF_API_KEY
 )
 
-# ── Static knowledge base ────────────────────────────────────────────────────
-TOPIC_CONTEXT = {
-    "python-basics": "Python basics: variables, data types, if/else, loops.",
-    "python-loops": "Loops: for, while, break, continue.",
-    "python-functions": "Functions: def, return, args, kwargs.",
-    "python-oop": "OOP: class, objects, inheritance.",
-    "machine-learning": "ML: supervised, unsupervised, models.",
+# ── FULL TOPIC CONTEXT (RESTORED ✅) ─────────────────────────────────────────
+TOPIC_CONTEXT: dict[str, str] = {
+    "python-basics": (
+        "Python is a high-level interpreted language. Variables, data types, "
+        "print(), input(), if/else, indentation."
+    ),
+    "python-loops": (
+        "Loops: for, while, range(), break, continue, nested loops."
+    ),
+    "python-functions": (
+        "Functions: def, parameters, return values, lambda, scope."
+    ),
+    "python-oop": (
+        "OOP: class, __init__, self, inheritance, polymorphism."
+    ),
+    "algebra-basics": (
+        "Algebra: variables, equations, inequalities, solving for x."
+    ),
+    "calculus": (
+        "Calculus: limits, derivatives, integrals, rate of change."
+    ),
+    "physics-mechanics": (
+        "Mechanics: Newton's laws, motion, force, energy."
+    ),
+    "chemistry": (
+        "Chemistry: atoms, bonds, reactions, pH, periodic table."
+    ),
+    "machine-learning": (
+        "ML: supervised, unsupervised learning, models, overfitting."
+    ),
+    "neural-networks": (
+        "Neural nets: layers, neurons, activation, backpropagation."
+    ),
 }
 
 DIFFICULTY_MAP: dict[str, Literal["Beginner", "Intermediate", "Advanced"]] = {
@@ -44,10 +69,15 @@ DIFFICULTY_MAP: dict[str, Literal["Beginner", "Intermediate", "Advanced"]] = {
     "python-loops": "Beginner",
     "python-functions": "Intermediate",
     "python-oop": "Intermediate",
+    "algebra-basics": "Beginner",
+    "calculus": "Advanced",
+    "physics-mechanics": "Intermediate",
+    "chemistry": "Intermediate",
     "machine-learning": "Advanced",
+    "neural-networks": "Advanced",
 }
 
-# ── Request schema (matches your frontend) ───────────────────────────────────
+# ── Request schema (frontend-compatible) ─────────────────────────────────────
 class Message(BaseModel):
     role: str
     content: str
@@ -77,11 +107,7 @@ def detect_topic(prompt: str) -> str:
 
 def hf_generate(prompt: str) -> str:
     try:
-        response = client.text_generation(
-            prompt,
-            max_new_tokens=200
-        )
-        return response.strip()
+        return client.text_generation(prompt, max_new_tokens=200).strip()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -103,7 +129,7 @@ async def get_insights(req: InsightRequest):
 
     try:
         summary = hf_generate(
-            f"{context}\nExplain {topic_label} simply in 2 sentences."
+            f"{context}\nExplain {topic_label} in 2 simple sentences."
         )
 
         tricks_raw = hf_generate(
