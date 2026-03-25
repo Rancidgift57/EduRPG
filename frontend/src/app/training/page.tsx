@@ -41,7 +41,7 @@ const TIPS: Record<string, string[]> = {
     "neural-networks": ["Neurons are computational units", "Layers transform data step by step", "Backpropagation updates weights"],
 };
 
-// ── AI Insight Panel ─────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface AIInsight {
     summary: string;
     tricks: string[];
@@ -49,12 +49,16 @@ interface AIInsight {
     difficulty: string;
 }
 
+// ── AI Insight Panel ──────────────────────────────────────────────────────────
 function AIInsightPanel({ topic, color, videoTitle }: { topic: typeof TOPICS[0]; color: string; videoTitle: string }) {
     const [insight, setInsight] = useState<AIInsight | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [asked, setAsked] = useState(false);
 
+    // ✅ FIX 1: fetchInsight is a properly scoped async arrow function.
+    //    In the original code, difficultyColor and the return() JSX were
+    //    accidentally written INSIDE this function after the try/catch.
     const fetchInsight = async () => {
         setLoading(true);
         setError(null);
@@ -73,60 +77,72 @@ Generate a JSON object (no markdown, no backticks, pure JSON) with these fields:
 The tricks should be practical memory hacks, mnemonics, or shortcuts to master ${topic.label} faster. Keep everything concise and gamified in tone.`;
 
         try {
-    const response = await fetch("https://edurpg-1.onrender.com/insights", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            prompt: prompt   // ✅ simplified (let backend decide model)
-        }),
-    });
+            const response = await fetch("https://edurpg-1.onrender.com/insights", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt }),
+            });
 
-    if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-    }
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
 
-    const data = await response.json();
+            const data = await response.json();
 
-    // ✅ Case 1: If backend returns parsed JSON directly
-    if (data.result) {
-        setInsight(data.result);
-        return;
-    }
+            // Case 1: backend returns already-parsed object in data.result
+            if (data.result && typeof data.result === "object") {
+                setInsight({
+                    summary: data.result.summary ?? "No summary available.",
+                    tricks: Array.isArray(data.result.tricks) ? data.result.tricks : [],
+                    analogy: data.result.analogy ?? "",
+                    difficulty: data.result.difficulty ?? "Intermediate",
+                });
+                return;
+            }
 
-    // ✅ Case 2: If backend returns raw text (Claude/OpenAI style)
-    let rawText = "";
+            // Case 2: backend returns raw text string or content array
+            let rawText = "";
+            if (Array.isArray(data.content)) {
+                rawText = data.content
+                    .map((c: { type: string; text?: string }) => c.type === "text" ? c.text ?? "" : "")
+                    .join("");
+            } else if (typeof data.text === "string") {
+                rawText = data.text;
+            } else if (typeof data === "string") {
+                rawText = data;
+            }
 
-    if (Array.isArray(data.content)) {
-        rawText = data.content
-            .map((c: { type: string; text?: string }) =>
-                c.type === "text" ? c.text : ""
-            )
-            .join("");
-    } else if (typeof data === "string") {
-        rawText = data;
-    } else if (data.text) {
-        rawText = data.text;
-    }
+            const clean = rawText.replace(/```json|```/g, "").trim();
 
-    // ✅ Clean markdown if present
-    const clean = rawText.replace(/```json|```/g, "").trim();
+            // ✅ FIX 2: fallback always produces a valid AIInsight shape.
+            //    The original code did setInsight({ raw: clean }) which
+            //    doesn't match the interface and crashes the render below.
+            try {
+                const parsed = JSON.parse(clean);
+                setInsight({
+                    summary: parsed.summary ?? "No summary available.",
+                    tricks: Array.isArray(parsed.tricks) ? parsed.tricks : [],
+                    analogy: parsed.analogy ?? "",
+                    difficulty: parsed.difficulty ?? "Intermediate",
+                });
+            } catch {
+                setInsight({
+                    summary: clean || "Could not parse AI response.",
+                    tricks: [],
+                    analogy: "",
+                    difficulty: "Intermediate",
+                });
+            }
+        } catch (e) {
+            console.error(e);
+            setError("AI mentor is meditating… try again in a moment.");
+        } finally {
+            setLoading(false);
+        }
+    }; // ← fetchInsight ends HERE (the original was missing this closing brace)
 
-    // ✅ Safe JSON parse
-    try {
-        const parsed: AIInsight = JSON.parse(clean);
-        setInsight(parsed);
-    } catch (parseError) {
-        console.warn("JSON parse failed, using raw text");
-        setInsight({ raw: clean }); // fallback
-    }
-
-} catch (e) {
-    console.error(e);
-    setError("AI mentor is meditating… try again in a moment.");
-} finally {
-    setLoading(false);
-}
-
+    // ✅ FIX 1 (continued): difficultyColor is now a proper component-level
+    //    helper, not buried inside the async function.
     const difficultyColor = (d: string) =>
         d === "Beginner" ? "#4ade80" : d === "Intermediate" ? "#fbbf24" : "#f87171";
 
@@ -137,16 +153,13 @@ The tricks should be practical memory hacks, mnemonics, or shortcuts to master $
             borderRadius: 18,
             marginBottom: 22,
             overflow: "hidden",
-            position: "relative",
         }}>
             {/* Panel Header */}
             <div style={{
                 backgroundImage: `linear-gradient(135deg,${color}18,rgba(0,0,0,0.3))`,
                 borderBottom: `1px solid ${color}20`,
                 padding: "16px 22px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{
@@ -156,12 +169,11 @@ The tricks should be practical memory hacks, mnemonics, or shortcuts to master $
                         fontSize: 16, boxShadow: `0 0 14px ${color}40`
                     }}>🤖</div>
                     <div>
-                        <div style={{
-                            fontFamily: "Cinzel", fontSize: 13, fontWeight: 700,
-                            color, letterSpacing: "0.1em"
-                        }}>AI MENTOR</div>
+                        <div style={{ fontFamily: "Cinzel", fontSize: 13, fontWeight: 700, color, letterSpacing: "0.1em" }}>
+                            AI MENTOR
+                        </div>
                         <div style={{ fontSize: 10, color: "#6b7280", fontWeight: 500 }}>
-                            Powered by Claude · Smart Insights
+                            Powered by AI · Smart Insights
                         </div>
                     </div>
                 </div>
@@ -172,8 +184,7 @@ The tricks should be practical memory hacks, mnemonics, or shortcuts to master $
                         border: "none", borderRadius: 10, padding: "9px 20px",
                         color: "#000", fontFamily: "Cinzel", fontSize: 11,
                         cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em",
-                        boxShadow: `0 0 18px ${color}50`,
-                        transition: "all 0.2s"
+                        boxShadow: `0 0 18px ${color}50`, transition: "all 0.2s"
                     }}
                         onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
                         onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
@@ -182,7 +193,7 @@ The tricks should be practical memory hacks, mnemonics, or shortcuts to master $
                 )}
             </div>
 
-            {/* Not asked yet — teaser */}
+            {/* Teaser (not yet asked) */}
             {!asked && (
                 <div style={{ padding: "22px 24px", textAlign: "center" }}>
                     <div style={{ fontSize: 36, marginBottom: 10, filter: `drop-shadow(0 0 12px ${color})` }}>🧠</div>
@@ -195,13 +206,12 @@ The tricks should be practical memory hacks, mnemonics, or shortcuts to master $
                 </div>
             )}
 
-            {/* Loading */}
+            {/* Loading spinner */}
             {loading && (
                 <div style={{ padding: "32px 24px", textAlign: "center" }}>
                     <div style={{
                         width: 44, height: 44, borderRadius: "50%", margin: "0 auto 16px",
-                        border: `3px solid ${color}30`,
-                        borderTopColor: color,
+                        border: `3px solid ${color}30`, borderTopColor: color,
                         animation: "spin 0.9s linear infinite",
                     }} />
                     <div style={{ fontFamily: "Cinzel", fontSize: 13, color, letterSpacing: "0.1em" }}>
@@ -213,7 +223,7 @@ The tricks should be practical memory hacks, mnemonics, or shortcuts to master $
                 </div>
             )}
 
-            {/* Error */}
+            {/* Error state */}
             {error && !loading && (
                 <div style={{ padding: "22px 24px", textAlign: "center" }}>
                     <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
@@ -226,11 +236,11 @@ The tricks should be practical memory hacks, mnemonics, or shortcuts to master $
                 </div>
             )}
 
-            {/* Insight Result */}
+            {/* Result */}
             {insight && !loading && (
                 <div style={{ padding: "22px 24px", animation: "fadeSlideIn 0.4s ease-out" }}>
 
-                    {/* Difficulty Badge */}
+                    {/* Difficulty badge */}
                     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
                         <div style={{
                             background: `${difficultyColor(insight.difficulty)}15`,
@@ -238,9 +248,7 @@ The tricks should be practical memory hacks, mnemonics, or shortcuts to master $
                             borderRadius: 20, padding: "4px 14px",
                             fontSize: 10, color: difficultyColor(insight.difficulty),
                             fontFamily: "Cinzel", fontWeight: 700, letterSpacing: "0.1em"
-                        }}>
-                            ⚔️ {insight.difficulty}
-                        </div>
+                        }}>⚔️ {insight.difficulty}</div>
                     </div>
 
                     {/* Summary */}
@@ -259,67 +267,64 @@ The tricks should be practical memory hacks, mnemonics, or shortcuts to master $
                     </div>
 
                     {/* Analogy */}
-                    <div style={{
-                        background: "rgba(255,255,255,0.03)",
-                        border: "1px solid rgba(255,255,255,0.07)",
-                        borderRadius: 12, padding: "14px 18px", marginBottom: 18,
-                        display: "flex", gap: 12, alignItems: "flex-start"
-                    }}>
-                        <div style={{ fontSize: 24, flexShrink: 0, filter: `drop-shadow(0 0 8px ${color})` }}>💡</div>
+                    {insight.analogy && (
+                        <div style={{
+                            background: "rgba(255,255,255,0.03)",
+                            border: "1px solid rgba(255,255,255,0.07)",
+                            borderRadius: 12, padding: "14px 18px", marginBottom: 18,
+                            display: "flex", gap: 12, alignItems: "flex-start"
+                        }}>
+                            <div style={{ fontSize: 24, flexShrink: 0, filter: `drop-shadow(0 0 8px ${color})` }}>💡</div>
+                            <div>
+                                <div style={{
+                                    fontFamily: "Cinzel", fontSize: 10, color: "#fbbf24",
+                                    letterSpacing: "0.2em", fontWeight: 700, marginBottom: 6
+                                }}>GOLDEN ANALOGY</div>
+                                <p style={{ color: "#e5e7eb", fontSize: 13, lineHeight: 1.6, fontWeight: 500, margin: 0, fontStyle: "italic" }}>
+                                    "{insight.analogy}"
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Memory Tricks — ✅ FIX 3: guarded against undefined/empty tricks array */}
+                    {insight.tricks.length > 0 && (
                         <div>
                             <div style={{
-                                fontFamily: "Cinzel", fontSize: 10, color: "#fbbf24",
-                                letterSpacing: "0.2em", fontWeight: 700, marginBottom: 6
-                            }}>GOLDEN ANALOGY</div>
-                            <p style={{ color: "#e5e7eb", fontSize: 13, lineHeight: 1.6, fontWeight: 500, margin: 0, fontStyle: "italic" }}>
-                                "{insight.analogy}"
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Memory Tricks */}
-                    <div>
-                        <div style={{
-                            fontFamily: "Cinzel", fontSize: 10, color,
-                            letterSpacing: "0.2em", fontWeight: 700, marginBottom: 12
-                        }}>🧪 MEMORY TRICKS TO WIN</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            {insight.tricks.map((trick, i) => (
-                                <div key={i} style={{
-                                    display: "flex", alignItems: "flex-start", gap: 12,
-                                    animation: `fadeSlideIn 0.3s ease-out ${i * 0.07}s both`
-                                }}>
-                                    <div style={{
-                                        width: 24, height: 24, borderRadius: 7, flexShrink: 0,
-                                        backgroundImage: `linear-gradient(135deg,${color},${color}66)`,
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontSize: 10, fontWeight: 900, color: "#000", fontFamily: "Cinzel",
-                                        boxShadow: `0 0 8px ${color}40`
+                                fontFamily: "Cinzel", fontSize: 10, color,
+                                letterSpacing: "0.2em", fontWeight: 700, marginBottom: 12
+                            }}>🧪 MEMORY TRICKS TO WIN</div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                {insight.tricks.map((trick, i) => (
+                                    <div key={i} style={{
+                                        display: "flex", alignItems: "flex-start", gap: 12,
+                                        animation: `fadeSlideIn 0.3s ease-out ${i * 0.07}s both`
                                     }}>
-                                        {i + 1}
+                                        <div style={{
+                                            width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+                                            backgroundImage: `linear-gradient(135deg,${color},${color}66)`,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            fontSize: 10, fontWeight: 900, color: "#000", fontFamily: "Cinzel",
+                                            boxShadow: `0 0 8px ${color}40`
+                                        }}>{i + 1}</div>
+                                        <div style={{
+                                            flex: 1, background: `${color}08`,
+                                            border: `1px solid ${color}15`,
+                                            borderRadius: 8, padding: "8px 12px",
+                                            fontSize: 13, color: "#d1d5db", lineHeight: 1.5, fontWeight: 500
+                                        }}>{trick}</div>
                                     </div>
-                                    <div style={{
-                                        flex: 1,
-                                        background: `${color}08`,
-                                        border: `1px solid ${color}15`,
-                                        borderRadius: 8, padding: "8px 12px",
-                                        fontSize: 13, color: "#d1d5db", lineHeight: 1.5, fontWeight: 500
-                                    }}>
-                                        {trick}
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Regenerate */}
                     <div style={{ marginTop: 18, textAlign: "right" }}>
                         <button onClick={fetchInsight} style={{
-                            background: "transparent",
-                            border: `1px solid ${color}30`,
-                            borderRadius: 8, padding: "7px 16px",
-                            color: `${color}90`, cursor: "pointer",
-                            fontSize: 11, fontFamily: "Cinzel", fontWeight: 700,
+                            background: "transparent", border: `1px solid ${color}30`,
+                            borderRadius: 8, padding: "7px 16px", color: `${color}90`,
+                            cursor: "pointer", fontSize: 11, fontFamily: "Cinzel", fontWeight: 700,
                             letterSpacing: "0.08em", transition: "all 0.2s"
                         }}
                             onMouseEnter={e => { e.currentTarget.style.color = color; e.currentTarget.style.borderColor = `${color}60`; }}
@@ -343,8 +348,6 @@ export default function TrainingPage() {
 
     return (
         <div style={{ minHeight: "100vh", background: "#030712", color: "#fff", fontFamily: "Rajdhani" }}>
-
-            {/* Inject fonts */}
             <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
         @keyframes fadeSlideIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
@@ -361,10 +364,9 @@ export default function TrainingPage() {
                 position: "sticky", top: 0, zIndex: 50, backdropFilter: "blur(16px)"
             }}>
                 <button onClick={() => router.push("/")} style={{
-                    background: "none",
-                    border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "7px 16px",
-                    cursor: "pointer", color: "#9ca3af", fontSize: 13, fontFamily: "Rajdhani", fontWeight: 600,
-                    transition: "all 0.2s"
+                    background: "none", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8,
+                    padding: "7px 16px", cursor: "pointer", color: "#9ca3af", fontSize: 13,
+                    fontFamily: "Rajdhani", fontWeight: 600, transition: "all 0.2s"
                 }}
                     onMouseEnter={e => e.currentTarget.style.color = "#fff"}
                     onMouseLeave={e => e.currentTarget.style.color = "#9ca3af"}>← HOME</button>
@@ -374,17 +376,14 @@ export default function TrainingPage() {
                     background: "linear-gradient(135deg,#60a5fa,#a855f7,#ec4899)",
                     WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
                     letterSpacing: "0.12em"
-                }}>
-                    📚 TRAINING ROOM
-                </div>
+                }}>📚 TRAINING ROOM</div>
 
                 <button onClick={() => { localStorage.setItem("selectedTopic", selectedTopic); router.push("/"); }}
                     style={{
                         backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d)",
                         border: "none", borderRadius: 10, padding: "9px 22px", color: "#fff",
                         fontFamily: "Cinzel", fontSize: 12, cursor: "pointer", fontWeight: 700,
-                        letterSpacing: "0.1em", boxShadow: "0 0 20px rgba(124,58,237,0.45)",
-                        transition: "all 0.2s"
+                        letterSpacing: "0.1em", boxShadow: "0 0 20px rgba(124,58,237,0.45)", transition: "all 0.2s"
                     }}
                     onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
                     onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
@@ -394,15 +393,13 @@ export default function TrainingPage() {
 
             <div style={{ display: "flex", maxWidth: 1100, margin: "0 auto", padding: "28px 20px", gap: 24 }}>
 
-                {/* ── Sidebar ─────────────────────────── */}
+                {/* Sidebar */}
                 <div style={{ width: 210, flexShrink: 0 }}>
                     <div style={{
                         fontFamily: "Cinzel", fontSize: 10, color: "#7c3aed",
                         letterSpacing: "0.25em", fontWeight: 700, marginBottom: 14,
                         paddingBottom: 8, borderBottom: "1px solid rgba(168,85,247,0.15)"
-                    }}>
-                        DUNGEONS
-                    </div>
+                    }}>DUNGEONS</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                         {TOPICS.map((t, i) => {
                             const isSel = selectedTopic === t.key;
@@ -412,10 +409,10 @@ export default function TrainingPage() {
                                     border: `1px solid ${isSel ? t.color + "35" : "transparent"}`,
                                     borderRadius: 10, padding: "9px 12px",
                                     color: isSel ? t.color : "#6b7280",
-                                    cursor: "pointer", textAlign: "left", fontSize: 13, fontWeight: isSel ? 700 : 500,
+                                    cursor: "pointer", textAlign: "left", fontSize: 13,
+                                    fontWeight: isSel ? 700 : 500,
                                     display: "flex", alignItems: "center", gap: 10,
-                                    transition: "all 0.2s",
-                                    fontFamily: "Rajdhani",
+                                    transition: "all 0.2s", fontFamily: "Rajdhani",
                                     boxShadow: isSel ? `0 0 12px ${t.color}20` : "none",
                                     animation: `fadeSlideIn 0.3s ease-out ${i * 0.04}s both`,
                                 }}
@@ -433,7 +430,7 @@ export default function TrainingPage() {
                     </div>
                 </div>
 
-                {/* ── Main Content ─────────────────────── */}
+                {/* Main Content */}
                 <div style={{ flex: 1, animation: "fadeSlideIn 0.4s ease-out" }}>
 
                     {/* Topic Header */}
@@ -447,52 +444,41 @@ export default function TrainingPage() {
                             <div style={{
                                 fontFamily: "Cinzel", fontSize: 28, fontWeight: 900,
                                 color: current.color, textShadow: `0 0 20px ${current.color}60`
-                            }}>
-                                {current.emoji} {current.label}
-                            </div>
+                            }}>{current.emoji} {current.label}</div>
                             <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4, fontWeight: 500 }}>
                                 Defeat the <span style={{ color: current.color, fontWeight: 700 }}>{current.monster}</span> by mastering this topic
                             </div>
                         </div>
-                        <div style={{ textAlign: "center" }}>
-                            <div style={{ fontSize: 52, filter: `drop-shadow(0 0 16px ${current.color})` }}>{current.emoji}</div>
-                        </div>
+                        <div style={{ fontSize: 52, filter: `drop-shadow(0 0 16px ${current.color})` }}>{current.emoji}</div>
                     </div>
 
-                    {/* Video player */}
+                    {/* Video Player */}
                     {videos.map(v => (
                         <div key={v.videoId} style={{
-                            background: "rgba(0,0,0,0.5)",
-                            border: "1px solid rgba(255,255,255,0.07)",
+                            background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.07)",
                             borderRadius: 18, overflow: "hidden", marginBottom: 22
                         }}>
-                            <div style={{ aspectRatio: "16/9", position: "relative" }}>
+                            <div style={{ aspectRatio: "16/9" }}>
                                 <iframe width="100%" height="100%"
                                     src={`https://www.youtube.com/embed/${v.videoId}?rel=0&modestbranding=1`}
                                     title={v.title} allowFullScreen
-                                    style={{ border: "none", display: "block", borderRadius: "16px 16px 0 0" }} />
+                                    style={{ border: "none", display: "block" }} />
                             </div>
-                            <div style={{
-                                padding: "16px 20px", display: "flex",
-                                justifyContent: "space-between", alignItems: "center"
-                            }}>
+                            <div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div>
                                     <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 3 }}>{v.title}</div>
                                     <div style={{ fontSize: 12, color: "#6b7280" }}>{v.channel} · {v.duration}</div>
                                 </div>
                                 <div style={{
                                     backgroundImage: `linear-gradient(135deg,${current.color}22,rgba(0,0,0,0.3))`,
-                                    border: `1px solid ${current.color}35`,
-                                    borderRadius: 10, padding: "8px 16px",
+                                    border: `1px solid ${current.color}35`, borderRadius: 10, padding: "8px 16px",
                                     fontSize: 11, color: current.color, fontFamily: "Cinzel", fontWeight: 700
-                                }}>
-                                    📺 STUDY
-                                </div>
+                                }}>📺 STUDY</div>
                             </div>
                         </div>
                     ))}
 
-                    {/* ── AI Insight Panel (new) ─────────────── */}
+                    {/* AI Insight Panel */}
                     <AIInsightPanel
                         key={selectedTopic}
                         topic={current}
@@ -500,35 +486,25 @@ export default function TrainingPage() {
                         videoTitle={videos[0]?.title ?? current.label}
                     />
 
-                    {/* Tips */}
+                    {/* Battle Tips */}
                     <div style={{
-                        background: "rgba(0,0,0,0.4)",
-                        border: `1px solid ${current.color}22`,
+                        background: "rgba(0,0,0,0.4)", border: `1px solid ${current.color}22`,
                         borderRadius: 16, padding: "20px 24px", marginBottom: 22
                     }}>
                         <div style={{
                             fontFamily: "Cinzel", fontSize: 13, fontWeight: 700,
                             color: current.color, marginBottom: 14, letterSpacing: "0.12em"
-                        }}>
-                            💡 BATTLE TIPS — {current.label.toUpperCase()}
-                        </div>
+                        }}>💡 BATTLE TIPS — {current.label.toUpperCase()}</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                             {tips.map((tip, i) => (
-                                <div key={i} style={{
-                                    display: "flex", alignItems: "flex-start", gap: 12,
-                                    animation: `fadeSlideIn 0.3s ease-out ${i * 0.08}s both`
-                                }}>
+                                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, animation: `fadeSlideIn 0.3s ease-out ${i * 0.08}s both` }}>
                                     <div style={{
                                         width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
                                         backgroundImage: `linear-gradient(135deg,${current.color},${current.color}88)`,
                                         display: "flex", alignItems: "center", justifyContent: "center",
                                         fontSize: 11, fontWeight: 900, color: "#000", fontFamily: "Cinzel"
-                                    }}>
-                                        {i + 1}
-                                    </div>
-                                    <div style={{ fontSize: 14, color: "#d1d5db", lineHeight: 1.5, fontWeight: 500 }}>
-                                        {tip}
-                                    </div>
+                                    }}>{i + 1}</div>
+                                    <div style={{ fontSize: 14, color: "#d1d5db", lineHeight: 1.5, fontWeight: 500 }}>{tip}</div>
                                 </div>
                             ))}
                         </div>
@@ -537,28 +513,24 @@ export default function TrainingPage() {
                     {/* Battle CTA */}
                     <div style={{
                         backgroundImage: "linear-gradient(135deg,rgba(88,28,135,0.3),rgba(185,28,28,0.3))",
-                        border: "1px solid rgba(168,85,247,0.25)",
-                        borderRadius: 18, padding: "28px", textAlign: "center"
+                        border: "1px solid rgba(168,85,247,0.25)", borderRadius: 18, padding: "28px", textAlign: "center"
                     }}>
                         <div style={{
                             fontFamily: "Cinzel", fontSize: 22, fontWeight: 900, marginBottom: 8,
                             background: "linear-gradient(135deg,#c084fc,#f472b6,#fb923c)",
                             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent"
-                        }}>
-                            Ready for Battle?
-                        </div>
+                        }}>Ready for Battle?</div>
                         <p style={{ color: "#6b7280", fontSize: 14, marginBottom: 24, fontWeight: 500 }}>
                             You've studied {current.label}. Now defeat the <span style={{ color: current.color, fontWeight: 700 }}>{current.monster}</span>!
                         </p>
                         <button onClick={() => { localStorage.setItem("selectedTopic", selectedTopic); router.push("/"); }}
                             style={{
                                 backgroundImage: "linear-gradient(135deg,#7c3aed,#be185d,#dc2626)",
-                                backgroundSize: "200% 200%",
                                 border: "none", borderRadius: 14, padding: "16px 52px",
                                 color: "#fff", fontFamily: "Cinzel", fontSize: 18, cursor: "pointer",
                                 fontWeight: 700, letterSpacing: "0.12em",
                                 boxShadow: "0 0 40px rgba(124,58,237,0.5),0 0 80px rgba(124,58,237,0.2)",
-                                transition: "all 0.3s", position: "relative", overflow: "hidden"
+                                transition: "all 0.3s"
                             }}
                             onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05) translateY(-2px)"; e.currentTarget.style.boxShadow = "0 0 60px rgba(124,58,237,0.8)"; }}
                             onMouseLeave={e => { e.currentTarget.style.transform = "scale(1) translateY(0)"; e.currentTarget.style.boxShadow = "0 0 40px rgba(124,58,237,0.5)"; }}>
