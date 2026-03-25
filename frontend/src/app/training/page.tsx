@@ -41,6 +41,299 @@ const TIPS: Record<string, string[]> = {
     "neural-networks": ["Neurons are computational units", "Layers transform data step by step", "Backpropagation updates weights"],
 };
 
+// ── AI Insight Panel ─────────────────────────────────────────────────────────
+interface AIInsight {
+    summary: string;
+    tricks: string[];
+    analogy: string;
+    difficulty: string;
+}
+
+function AIInsightPanel({ topic, color, videoTitle }: { topic: typeof TOPICS[0]; color: string; videoTitle: string }) {
+    const [insight, setInsight] = useState<AIInsight | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [asked, setAsked] = useState(false);
+
+    const fetchInsight = async () => {
+        setLoading(true);
+        setError(null);
+        setAsked(true);
+
+        const prompt = `You are an expert tutor for a gamified learning app. The student is studying "${topic.label}" and watching: "${videoTitle}".
+
+Generate a JSON object (no markdown, no backticks, pure JSON) with these fields:
+{
+  "summary": "A 2-3 sentence engaging summary of what this topic covers and why it matters for beginners",
+  "tricks": ["trick 1", "trick 2", "trick 3", "trick 4"],
+  "analogy": "One memorable real-world analogy that makes ${topic.label} click instantly",
+  "difficulty": "Beginner | Intermediate | Advanced"
+}
+
+The tricks should be practical memory hacks, mnemonics, or shortcuts to master ${topic.label} faster. Keep everything concise and gamified in tone.`;
+
+        try {
+    const response = await fetch("https://edurpg-1.onrender.com/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            prompt: prompt   // ✅ simplified (let backend decide model)
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // ✅ Case 1: If backend returns parsed JSON directly
+    if (data.result) {
+        setInsight(data.result);
+        return;
+    }
+
+    // ✅ Case 2: If backend returns raw text (Claude/OpenAI style)
+    let rawText = "";
+
+    if (Array.isArray(data.content)) {
+        rawText = data.content
+            .map((c: { type: string; text?: string }) =>
+                c.type === "text" ? c.text : ""
+            )
+            .join("");
+    } else if (typeof data === "string") {
+        rawText = data;
+    } else if (data.text) {
+        rawText = data.text;
+    }
+
+    // ✅ Clean markdown if present
+    const clean = rawText.replace(/```json|```/g, "").trim();
+
+    // ✅ Safe JSON parse
+    try {
+        const parsed: AIInsight = JSON.parse(clean);
+        setInsight(parsed);
+    } catch (parseError) {
+        console.warn("JSON parse failed, using raw text");
+        setInsight({ raw: clean }); // fallback
+    }
+
+} catch (e) {
+    console.error(e);
+    setError("AI mentor is meditating… try again in a moment.");
+} finally {
+    setLoading(false);
+}
+
+    const difficultyColor = (d: string) =>
+        d === "Beginner" ? "#4ade80" : d === "Intermediate" ? "#fbbf24" : "#f87171";
+
+    return (
+        <div style={{
+            background: "rgba(0,0,0,0.55)",
+            border: `1px solid ${color}30`,
+            borderRadius: 18,
+            marginBottom: 22,
+            overflow: "hidden",
+            position: "relative",
+        }}>
+            {/* Panel Header */}
+            <div style={{
+                backgroundImage: `linear-gradient(135deg,${color}18,rgba(0,0,0,0.3))`,
+                borderBottom: `1px solid ${color}20`,
+                padding: "16px 22px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{
+                        width: 34, height: 34, borderRadius: 10,
+                        backgroundImage: `linear-gradient(135deg,${color},${color}66)`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 16, boxShadow: `0 0 14px ${color}40`
+                    }}>🤖</div>
+                    <div>
+                        <div style={{
+                            fontFamily: "Cinzel", fontSize: 13, fontWeight: 700,
+                            color, letterSpacing: "0.1em"
+                        }}>AI MENTOR</div>
+                        <div style={{ fontSize: 10, color: "#6b7280", fontWeight: 500 }}>
+                            Powered by Claude · Smart Insights
+                        </div>
+                    </div>
+                </div>
+
+                {!asked && (
+                    <button onClick={fetchInsight} style={{
+                        backgroundImage: `linear-gradient(135deg,${color},${color}88)`,
+                        border: "none", borderRadius: 10, padding: "9px 20px",
+                        color: "#000", fontFamily: "Cinzel", fontSize: 11,
+                        cursor: "pointer", fontWeight: 700, letterSpacing: "0.08em",
+                        boxShadow: `0 0 18px ${color}50`,
+                        transition: "all 0.2s"
+                    }}
+                        onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
+                        onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
+                        ✨ GET AI INSIGHTS
+                    </button>
+                )}
+            </div>
+
+            {/* Not asked yet — teaser */}
+            {!asked && (
+                <div style={{ padding: "22px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: 36, marginBottom: 10, filter: `drop-shadow(0 0 12px ${color})` }}>🧠</div>
+                    <div style={{ fontFamily: "Cinzel", fontSize: 14, color: "#9ca3af", fontWeight: 600 }}>
+                        Unlock AI-powered insights for <span style={{ color }}>{topic.label}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#4b5563", marginTop: 6 }}>
+                        Video summary · Memory tricks · Real-world analogies
+                    </div>
+                </div>
+            )}
+
+            {/* Loading */}
+            {loading && (
+                <div style={{ padding: "32px 24px", textAlign: "center" }}>
+                    <div style={{
+                        width: 44, height: 44, borderRadius: "50%", margin: "0 auto 16px",
+                        border: `3px solid ${color}30`,
+                        borderTopColor: color,
+                        animation: "spin 0.9s linear infinite",
+                    }} />
+                    <div style={{ fontFamily: "Cinzel", fontSize: 13, color, letterSpacing: "0.1em" }}>
+                        AI MENTOR ANALYZING…
+                    </div>
+                    <div style={{ fontSize: 11, color: "#4b5563", marginTop: 4 }}>
+                        Summoning battle wisdom for {topic.label}
+                    </div>
+                </div>
+            )}
+
+            {/* Error */}
+            {error && !loading && (
+                <div style={{ padding: "22px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+                    <div style={{ color: "#f87171", fontSize: 13, fontWeight: 600 }}>{error}</div>
+                    <button onClick={fetchInsight} style={{
+                        marginTop: 14, background: "transparent",
+                        border: `1px solid ${color}40`, borderRadius: 8, padding: "8px 18px",
+                        color, cursor: "pointer", fontSize: 12, fontFamily: "Cinzel", fontWeight: 700
+                    }}>↻ RETRY</button>
+                </div>
+            )}
+
+            {/* Insight Result */}
+            {insight && !loading && (
+                <div style={{ padding: "22px 24px", animation: "fadeSlideIn 0.4s ease-out" }}>
+
+                    {/* Difficulty Badge */}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+                        <div style={{
+                            background: `${difficultyColor(insight.difficulty)}15`,
+                            border: `1px solid ${difficultyColor(insight.difficulty)}40`,
+                            borderRadius: 20, padding: "4px 14px",
+                            fontSize: 10, color: difficultyColor(insight.difficulty),
+                            fontFamily: "Cinzel", fontWeight: 700, letterSpacing: "0.1em"
+                        }}>
+                            ⚔️ {insight.difficulty}
+                        </div>
+                    </div>
+
+                    {/* Summary */}
+                    <div style={{
+                        backgroundImage: `linear-gradient(135deg,${color}0e,rgba(0,0,0,0.2))`,
+                        border: `1px solid ${color}20`,
+                        borderRadius: 12, padding: "16px 18px", marginBottom: 18
+                    }}>
+                        <div style={{
+                            fontFamily: "Cinzel", fontSize: 10, color,
+                            letterSpacing: "0.2em", fontWeight: 700, marginBottom: 8
+                        }}>📜 VIDEO SUMMARY</div>
+                        <p style={{ color: "#d1d5db", fontSize: 13, lineHeight: 1.65, fontWeight: 500, margin: 0 }}>
+                            {insight.summary}
+                        </p>
+                    </div>
+
+                    {/* Analogy */}
+                    <div style={{
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.07)",
+                        borderRadius: 12, padding: "14px 18px", marginBottom: 18,
+                        display: "flex", gap: 12, alignItems: "flex-start"
+                    }}>
+                        <div style={{ fontSize: 24, flexShrink: 0, filter: `drop-shadow(0 0 8px ${color})` }}>💡</div>
+                        <div>
+                            <div style={{
+                                fontFamily: "Cinzel", fontSize: 10, color: "#fbbf24",
+                                letterSpacing: "0.2em", fontWeight: 700, marginBottom: 6
+                            }}>GOLDEN ANALOGY</div>
+                            <p style={{ color: "#e5e7eb", fontSize: 13, lineHeight: 1.6, fontWeight: 500, margin: 0, fontStyle: "italic" }}>
+                                "{insight.analogy}"
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Memory Tricks */}
+                    <div>
+                        <div style={{
+                            fontFamily: "Cinzel", fontSize: 10, color,
+                            letterSpacing: "0.2em", fontWeight: 700, marginBottom: 12
+                        }}>🧪 MEMORY TRICKS TO WIN</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {insight.tricks.map((trick, i) => (
+                                <div key={i} style={{
+                                    display: "flex", alignItems: "flex-start", gap: 12,
+                                    animation: `fadeSlideIn 0.3s ease-out ${i * 0.07}s both`
+                                }}>
+                                    <div style={{
+                                        width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+                                        backgroundImage: `linear-gradient(135deg,${color},${color}66)`,
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: 10, fontWeight: 900, color: "#000", fontFamily: "Cinzel",
+                                        boxShadow: `0 0 8px ${color}40`
+                                    }}>
+                                        {i + 1}
+                                    </div>
+                                    <div style={{
+                                        flex: 1,
+                                        background: `${color}08`,
+                                        border: `1px solid ${color}15`,
+                                        borderRadius: 8, padding: "8px 12px",
+                                        fontSize: 13, color: "#d1d5db", lineHeight: 1.5, fontWeight: 500
+                                    }}>
+                                        {trick}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Regenerate */}
+                    <div style={{ marginTop: 18, textAlign: "right" }}>
+                        <button onClick={fetchInsight} style={{
+                            background: "transparent",
+                            border: `1px solid ${color}30`,
+                            borderRadius: 8, padding: "7px 16px",
+                            color: `${color}90`, cursor: "pointer",
+                            fontSize: 11, fontFamily: "Cinzel", fontWeight: 700,
+                            letterSpacing: "0.08em", transition: "all 0.2s"
+                        }}
+                            onMouseEnter={e => { e.currentTarget.style.color = color; e.currentTarget.style.borderColor = `${color}60`; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = `${color}90`; e.currentTarget.style.borderColor = `${color}30`; }}>
+                            ↻ REGENERATE INSIGHTS
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function TrainingPage() {
     const router = useRouter();
     const [selectedTopic, setSelectedTopic] = useState(TOPICS[0].key);
@@ -198,6 +491,14 @@ export default function TrainingPage() {
                             </div>
                         </div>
                     ))}
+
+                    {/* ── AI Insight Panel (new) ─────────────── */}
+                    <AIInsightPanel
+                        key={selectedTopic}
+                        topic={current}
+                        color={current.color}
+                        videoTitle={videos[0]?.title ?? current.label}
+                    />
 
                     {/* Tips */}
                     <div style={{
