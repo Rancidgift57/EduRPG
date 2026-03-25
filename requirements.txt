@@ -3,6 +3,7 @@ pytz
 fastapi 
 uvicorn 
 transformers 
-torch 
+torch
+huggingface_hub
 sentencepiece 
 accelerate
