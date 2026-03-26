@@ -1,16 +1,14 @@
 from __future__ import annotations
-
 import re
 import os
 from typing import List, Optional
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from huggingface_hub import InferenceClient
+from openai import OpenAI  # <--- New Import
 
 # ── App Setup ───────────────────────────────────────────────────────────────
-app = FastAPI(title="EduRPG AI Mentor Backend", version="5.0.0")
+app = FastAPI(title="EduRPG AI Mentor Backend", version="5.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,17 +17,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── HuggingFace Setup ───────────────────────────────────────────────────────
-HF_API_KEY = os.getenv("HF_API_KEY")
-if not HF_API_KEY:
-    raise ValueError("HF_API_KEY not set in environment")
+# ── HuggingFace Router Setup ────────────────────────────────────────────────
+HF_TOKEN = os.getenv("HF_API_KEY") # Ensure this matches your env var name
+if not HF_TOKEN:
+    raise ValueError("HF_API_KEY (HF_TOKEN) not set in environment")
 
-client = InferenceClient(
-    model="google/flan-t5-base",
-    token=HF_API_KEY
+# Initialize the client using the HF Router URL
+client = OpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=HF_TOKEN,
 )
 
-# ── Topics (MATCH FRONTEND EXACTLY) ─────────────────────────────────────────
+# Use a high-performance model available on the router
+MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct:cerebras"
+
+# ── Knowledge Base ──────────────────────────────────────────────────────────
 TOPIC_CONTEXT = {
     "python-basics": "Variables, data types, input/output, indentation, if-else.",
     "python-loops": "For loop, while loop, break, continue, nested loops.",
@@ -56,129 +58,64 @@ DIFFICULTY_MAP = {
     "neural-networks": "Advanced",
 }
 
-# ── Request Schema (FRONTEND FORMAT) ────────────────────────────────────────
+# ── Schemas ─────────────────────────────────────────────────────────────────
 class Message(BaseModel):
     role: str
     content: str
 
 class InsightRequest(BaseModel):
     model: Optional[str] = None
-    topic: Optional[str] = None   # 🔥 from frontend
-    max_tokens: Optional[int] = 256
+    topic: str  # Required for your logic
     messages: List[Message]
 
-# ── Response Schema ─────────────────────────────────────────────────────────
 class InsightResponse(BaseModel):
     summary: str
     tricks: List[str]
     analogy: str
     difficulty: str
 
-# ── Helpers ────────────────────────────────────────────────────────────────
-def extract_prompt(messages: List[Message]) -> str:
-    if not messages:
-        raise HTTPException(status_code=400, detail="Messages cannot be empty")
-    return " ".join([m.content for m in messages if m.role == "user"])
-
-import os
-import requests
-from fastapi import HTTPException
-
-HF_API_KEY = os.getenv("HF_API_KEY")
-
-API_URL = "https://router.huggingface.co/hf-inference/models/google/flan-t5-base"
-
-headers = {
-    "Authorization": f"Bearer {HF_API_KEY}",
-    "Content-Type": "application/json"
-}
-
-def hf_generate(prompt: str) -> str:
+# ── Core Logic ──────────────────────────────────────────────────────────────
+def hf_chat_generate(prompt: str) -> str:
+    """Uses the new OpenAI-compatible HF Router."""
     try:
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 150,
-                "temperature": 0.7
-            }
-        }
-
-        response = requests.post(API_URL, headers=headers, json=payload)
-
-        if response.status_code != 200:
-            print("HF ERROR:", response.text)
-            raise HTTPException(
-                status_code=500,
-                detail=f"HuggingFace Error: {response.text}"
-            )
-
-        data = response.json()
-
-        # ✅ handle both formats safely
-        if isinstance(data, list):
-            return data[0]["generated_text"].strip()
-        elif isinstance(data, dict) and "generated_text" in data:
-            return data["generated_text"].strip()
-        else:
-            return str(data)
-
+        completion = client.chat.completions.create(
+            model=MODEL_ID,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=150,
+            temperature=0.7
+        )
+        return completion.choices[0].message.content.strip()
     except Exception as e:
-        print("HF EXCEPTION:", str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"HF Router Error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI Provider Error: {str(e)}")
 
 def parse_tricks(text: str) -> List[str]:
-    lines = text.split("\n")
-    cleaned = [
-        re.sub(r"^\d+[\.\)]\s*", "", line).strip()
-        for line in lines if line.strip()
-    ]
+    # Improved regex to handle various list formats from LLMs
+    items = re.split(r'\n|(?<=\d\.)', text)
+    cleaned = [re.sub(r'^\d+[\.\)]\s*', '', item).strip() for item in items if item.strip()]
     return cleaned[:4]
 
-# ── MAIN ENDPOINT ───────────────────────────────────────────────────────────
+# ── Main Endpoint ───────────────────────────────────────────────────────────
 @app.post("/insights", response_model=InsightResponse)
 async def get_insights(req: InsightRequest):
+    if req.topic not in TOPIC_CONTEXT:
+        raise HTTPException(status_code=400, detail="Topic context not found")
 
-    # 1. Extract prompt
-    prompt = extract_prompt(req.messages)
+    topic_label = req.topic.replace("-", " ").title()
+    context = TOPIC_CONTEXT[req.topic]
 
-    # 2. Get topic (frontend controlled)
-    if not req.topic or req.topic not in TOPIC_CONTEXT:
-        raise HTTPException(status_code=400, detail="Invalid or missing topic")
+    # Generate 3 specific components
+    summary = hf_chat_generate(f"Context: {context}. Explain {topic_label} in 2 simple sentences for a student.")
+    tricks_raw = hf_chat_generate(f"Context: {context}. Give exactly 4 short, numbered memory mnemonics for {topic_label}.")
+    analogy = hf_chat_generate(f"Context: {context}. Give one real-world analogy for {topic_label} starting with 'It is like...'")
 
-    topic = req.topic
-    context = TOPIC_CONTEXT[topic]
-    difficulty = DIFFICULTY_MAP.get(topic, "Intermediate")
-
-    topic_label = topic.replace("-", " ").title()
-
-    # 3. Generate responses
-    summary = hf_generate(
-        f"{context}\nExplain {topic_label} in 2 simple sentences."
-    )
-
-    tricks_raw = hf_generate(
-        f"{context}\nGive 4 short memory tricks for {topic_label}."
-    )
-
-    analogy = hf_generate(
-        f"{context}\nGive one simple real-world analogy for {topic_label}."
-    )
-
-    tricks = parse_tricks(tricks_raw)
-
-    # 4. Return structured response
     return InsightResponse(
         summary=summary,
-        tricks=tricks,
+        tricks=parse_tricks(tricks_raw),
         analogy=analogy,
-        difficulty=difficulty,
+        difficulty=DIFFICULTY_MAP.get(req.topic, "Intermediate"),
     )
 
-# ── Health Check ────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    return {
-        "status": "ok",
-        "model": "HuggingFace API",
-        "message": "Backend running successfully"
-    }
+    return {"status": "ok", "provider": "HF Router (Cerebras)"}
