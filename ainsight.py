@@ -25,7 +25,7 @@ if not HF_API_KEY:
     raise ValueError("HF_API_KEY not set in environment")
 
 client = InferenceClient(
-    model="google/flan-t5-small",
+    model="mistralai/Mistral-7B-Instruct-v0.2",
     token=HF_API_KEY
 )
 
@@ -82,9 +82,18 @@ def extract_prompt(messages: List[Message]) -> str:
 
 def hf_generate(prompt: str) -> str:
     try:
-        return client.text_generation(prompt, max_new_tokens=200).strip()
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
+        )
+        return response.choices[0].message.content.strip()
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"HuggingFace Error: {str(e)}")
+        print("HF ERROR:", str(e))  # 🔥 LOG ERROR
+        raise HTTPException(
+            status_code=500,
+            detail=f"HuggingFace Error: {str(e)}"
+        )
 
 def parse_tricks(text: str) -> List[str]:
     lines = text.split("\n")
