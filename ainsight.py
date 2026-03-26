@@ -64,9 +64,9 @@ class Message(BaseModel):
     content: str
 
 class InsightRequest(BaseModel):
-    model: Optional[str] = None
-    topic: str  # Required for your logic
+    topic: str  # The frontend sends "python-basics", etc.
     messages: List[Message]
+    model: Optional[str] = None
 
 class InsightResponse(BaseModel):
     summary: str
