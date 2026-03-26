@@ -59,87 +59,43 @@ function AIInsightPanel({ topic, color, videoTitle }: { topic: typeof TOPICS[0];
     // ✅ FIX 1: fetchInsight is a properly scoped async arrow function.
     //    In the original code, difficultyColor and the return() JSX were
     //    accidentally written INSIDE this function after the try/catch.
-    const fetchInsight = async () => {
-        setLoading(true);
-        setError(null);
-        setAsked(true);
+const fetchInsight = async () => {
+    setLoading(true);
+    setError(null);
+    setAsked(true);
 
-        const prompt = `You are an expert tutor for a gamified learning app. The student is studying "${topic.label}" and watching: "${videoTitle}".
+    try {
+        const response = await fetch("https://edurpg-1.onrender.com/insights", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            // ✅ MATCHING THE BACKEND SCHEMA
+            body: JSON.stringify({ 
+                topic: topic.key, 
+                messages: [{ role: "user", content: `Help me with ${topic.label}` }] 
+            }),
+        });
 
-Generate a JSON object (no markdown, no backticks, pure JSON) with these fields:
-{
-  "summary": "A 2-3 sentence engaging summary of what this topic covers and why it matters for beginners",
-  "tricks": ["trick 1", "trick 2", "trick 3", "trick 4"],
-  "analogy": "One memorable real-world analogy that makes ${topic.label} click instantly",
-  "difficulty": "Beginner | Intermediate | Advanced"
-}
-
-The tricks should be practical memory hacks, mnemonics, or shortcuts to master ${topic.label} faster. Keep everything concise and gamified in tone.`;
-
-        try {
-            const response = await fetch("https://edurpg-1.onrender.com/insights", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            // Case 1: backend returns already-parsed object in data.result
-            if (data.result && typeof data.result === "object") {
-                setInsight({
-                    summary: data.result.summary ?? "No summary available.",
-                    tricks: Array.isArray(data.result.tricks) ? data.result.tricks : [],
-                    analogy: data.result.analogy ?? "",
-                    difficulty: data.result.difficulty ?? "Intermediate",
-                });
-                return;
-            }
-
-            // Case 2: backend returns raw text string or content array
-            let rawText = "";
-            if (Array.isArray(data.content)) {
-                rawText = data.content
-                    .map((c: { type: string; text?: string }) => c.type === "text" ? c.text ?? "" : "")
-                    .join("");
-            } else if (typeof data.text === "string") {
-                rawText = data.text;
-            } else if (typeof data === "string") {
-                rawText = data;
-            }
-
-            const clean = rawText.replace(/```json|```/g, "").trim();
-
-            // ✅ FIX 2: fallback always produces a valid AIInsight shape.
-            //    The original code did setInsight({ raw: clean }) which
-            //    doesn't match the interface and crashes the render below.
-            try {
-                const parsed = JSON.parse(clean);
-                setInsight({
-                    summary: parsed.summary ?? "No summary available.",
-                    tricks: Array.isArray(parsed.tricks) ? parsed.tricks : [],
-                    analogy: parsed.analogy ?? "",
-                    difficulty: parsed.difficulty ?? "Intermediate",
-                });
-            } catch {
-                setInsight({
-                    summary: clean || "Could not parse AI response.",
-                    tricks: [],
-                    analogy: "",
-                    difficulty: "Intermediate",
-                });
-            }
-        } catch (e) {
-            console.error(e);
-            setError("AI mentor is meditating… try again in a moment.");
-        } finally {
-            setLoading(false);
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
         }
-    }; // ← fetchInsight ends HERE (the original was missing this closing brace)
+
+        const data = await response.json();
+
+        // ✅ Our backend now returns a clean object: { summary, tricks, analogy, difficulty }
+        setInsight({
+            summary: data.summary,
+            tricks: data.tricks,
+            analogy: data.analogy,
+            difficulty: data.difficulty,
+        });
+
+    } catch (e) {
+        console.error(e);
+        setError("AI mentor is meditating… try again in a moment.");
+    } finally {
+        setLoading(false);
+    }
+}; // ← fetchInsight ends HERE (the original was missing this closing brace)
 
     // ✅ FIX 1 (continued): difficultyColor is now a proper component-level
     //    helper, not buried inside the async function.
