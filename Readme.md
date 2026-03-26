@@ -237,8 +237,8 @@ UptimeRobot         — Keep-alive pinging (free)
 │  clan_wars   │
 │  war_battles │
 └──────────────┘
-<img width="2752" height="1536" alt="Gemini_Generated_Image_je4yz4je4yz4je4y" src="https://github.com/user-attachments/assets/71f45ad8-31b5-42c5-9b59-5eeaab0c1190" />
 ```
+<img width="2752" height="1536" alt="Gemini_Generated_Image_je4yz4je4yz4je4y" src="https://github.com/user-attachments/assets/71f45ad8-31b5-42c5-9b59-5eeaab0c1190" />
 
 ---
 
