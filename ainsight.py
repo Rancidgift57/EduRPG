@@ -80,20 +80,43 @@ def extract_prompt(messages: List[Message]) -> str:
         raise HTTPException(status_code=400, detail="Messages cannot be empty")
     return " ".join([m.content for m in messages if m.role == "user"])
 
+import requests
+
+HF_API_KEY = os.getenv("HF_API_KEY")
+
+API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+
+headers = {
+    "Authorization": f"Bearer {HF_API_KEY}",
+    "Content-Type": "application/json"
+}
+
 def hf_generate(prompt: str) -> str:
     try:
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-        )
-        return response.choices[0].message.content.strip()
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 150
+            }
+        }
+
+        response = requests.post(API_URL, headers=headers, json=payload)
+
+        if response.status_code != 200:
+            print("HF ERROR:", response.text)
+            raise HTTPException(
+                status_code=500,
+                detail=f"HuggingFace Error: {response.text}"
+            )
+
+        data = response.json()
+
+        # ✅ correct parsing
+        return data[0]["generated_text"].strip()
 
     except Exception as e:
-        print("HF ERROR:", str(e))  # 🔥 LOG ERROR
-        raise HTTPException(
-            status_code=500,
-            detail=f"HuggingFace Error: {str(e)}"
-        )
+        print("HF EXCEPTION:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 def parse_tricks(text: str) -> List[str]:
     lines = text.split("\n")
