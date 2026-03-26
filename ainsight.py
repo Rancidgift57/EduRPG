@@ -25,7 +25,7 @@ if not HF_API_KEY:
     raise ValueError("HF_API_KEY not set in environment")
 
 client = InferenceClient(
-    model="mistralai/Mistral-7B-Instruct-v0.2",
+    model="google/flan-t5-base",
     token=HF_API_KEY
 )
 
