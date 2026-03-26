@@ -1339,6 +1339,8 @@ cd frontend && npx tsc --noEmit
 
 ---
 
+### Demo Video🔥 : https://www.youtube.com/watch?v=J2xxzBPmnWY&list=LL&index=1&t=3s
+
 ### ☁️ Hosting & Infrastructure
 
 | Service | What It Hosts | Plan Used |
