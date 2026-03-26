@@ -80,11 +80,13 @@ def extract_prompt(messages: List[Message]) -> str:
         raise HTTPException(status_code=400, detail="Messages cannot be empty")
     return " ".join([m.content for m in messages if m.role == "user"])
 
+import os
 import requests
+from fastapi import HTTPException
 
 HF_API_KEY = os.getenv("HF_API_KEY")
 
-API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+API_URL = "https://router.huggingface.co/hf-inference/models/google/flan-t5-base"
 
 headers = {
     "Authorization": f"Bearer {HF_API_KEY}",
@@ -96,7 +98,8 @@ def hf_generate(prompt: str) -> str:
         payload = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": 150
+                "max_new_tokens": 150,
+                "temperature": 0.7
             }
         }
 
@@ -111,8 +114,13 @@ def hf_generate(prompt: str) -> str:
 
         data = response.json()
 
-        # ✅ correct parsing
-        return data[0]["generated_text"].strip()
+        # ✅ handle both formats safely
+        if isinstance(data, list):
+            return data[0]["generated_text"].strip()
+        elif isinstance(data, dict) and "generated_text" in data:
+            return data["generated_text"].strip()
+        else:
+            return str(data)
 
     except Exception as e:
         print("HF EXCEPTION:", str(e))
