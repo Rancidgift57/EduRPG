@@ -57,6 +57,7 @@
 ## 🎮 Overview
 
 EduRPG is a full-stack gamified education platform that transforms studying into an RPG-style battle game. Students select heroes, enter dungeons (topic areas), and battle monsters by answering quiz questions correctly. Wrong answers let monsters attack back — creating genuine learning stakes that make the experience addictive.
+![EXPLAIN1](https://github.com/user-attachments/assets/fd24a381-6f34-4d6b-a430-5c4bd3bc6046)
 
 ### Why EduRPG?
 
