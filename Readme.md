@@ -1500,7 +1500,7 @@ This project is licensed under the MIT License.
 ```
 MIT License
 
-Copyright (c) 2026 EduRPG — Nikhil Nair * Mohit Paradkar * Tanmay Rewale * Prem Rana
+Copyright (c) 2026 EduRPG — Nikhil Nair
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
