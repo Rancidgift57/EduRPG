@@ -1307,7 +1307,7 @@ cd frontend && npx tsc --noEmit
 
 | | |
 |---|---|
-| **Name** | Nikhil Nair, Mohit Paradkar, Tanmay Rewale, Prem Rana |
+| **Name** | Nikhil Nair |
 | **Project** | EduRPG — Built independently as a passion project for students who hate boring studying |
 
 ---
